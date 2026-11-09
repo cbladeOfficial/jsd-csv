@@ -1,13 +1,18 @@
 """
-CSV Metadata Exporter.
-Exports rich song and collection metadata into a standardized CSV file in the output directory.
-Uses UTF-8 with BOM (utf-8-sig) for native compatibility with Microsoft Excel and Google Sheets.
+CSV Metadata Exporter and Importer.
+Exports rich song metadata into a standardized CSV file (utf-8-sig)
+and imports previously exported CSV files (local paths or online URLs)
+to resume, batch, or re-download songs later.
 """
 
 import csv
+import io
 import logging
 import os
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +49,6 @@ CSV_HEADERS = [
 
 def format_row(item: Dict[str, Any]) -> List[Any]:
     """Flattens a song record dictionary into a CSV row."""
-    # Ensure lyrics do not break CSV rendering by normalizing newlines
     full_lyrics = item.get("lyrics", "") or ""
     
     return [
@@ -76,6 +80,145 @@ def format_row(item: Dict[str, Any]) -> List[Any]:
         item.get("file_path", ""),
         item.get("download_status", "Pending"),
     ]
+
+
+def _normalize_key(header: str) -> str:
+    """Normalizes column names for fuzzy header matching."""
+    return re.sub(r"[^a-z0-9]", "", str(header).lower())
+
+
+def load_csv(source: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Loads song metadata records from a local CSV file or online HTTP/HTTPS URL.
+    
+    Args:
+        source: Local file path (e.g. './downloads/songs.csv') or remote URL (e.g. 'https://.../songs.csv').
+        
+    Returns:
+        Tuple of (collection_metadata, list_of_song_records).
+    """
+    source_clean = source.strip().strip("'\"")
+    is_remote = source_clean.startswith(("http://", "https://"))
+
+    raw_text: str = ""
+    title: str = "Imported CSV"
+
+    if is_remote:
+        logger.info(f"Downloading CSV from online URL: {source_clean}")
+        resp = requests.get(source_clean, timeout=20)
+        resp.raise_for_status()
+        raw_text = resp.text
+        url_part = source_clean.split("?")[0].rstrip("/").split("/")[-1]
+        title = os.path.splitext(url_part)[0] or "Online CSV"
+    else:
+        abs_path = os.path.abspath(source_clean)
+        if not os.path.exists(abs_path):
+            raise FileNotFoundError(f"CSV file not found: {abs_path}")
+        title = os.path.splitext(os.path.basename(abs_path))[0]
+        # Read with utf-8-sig first, fallback to utf-8 / latin-1
+        try:
+            with open(abs_path, "r", encoding="utf-8-sig") as f:
+                raw_text = f.read()
+        except UnicodeDecodeError:
+            with open(abs_path, "r", encoding="latin-1") as f:
+                raw_text = f.read()
+
+    reader = csv.reader(io.StringIO(raw_text))
+    rows = list(reader)
+    if not rows:
+        return {"type": "csv", "title": title, "count": 0, "source": source_clean}, []
+
+    raw_headers = rows[0]
+    col_map: Dict[str, int] = {_normalize_key(h): idx for idx, h in enumerate(raw_headers)}
+
+    def get_val(row: List[str], *aliases: str, default: Any = "") -> Any:
+        for alias in aliases:
+            norm = _normalize_key(alias)
+            if norm in col_map and col_map[norm] < len(row):
+                val = row[col_map[norm]].strip()
+                if val:
+                    return val
+        return default
+
+    songs: List[Dict[str, Any]] = []
+    for idx, r in enumerate(rows[1:], 1):
+        if not any(cell.strip() for cell in r):
+            continue
+
+        raw_title = get_val(r, "Title", "Song", "Track Name", default=f"Track {idx}")
+        raw_artists = get_val(r, "Artists", "All Artists", default="")
+        raw_primary = get_val(r, "Primary Artist", "Artist", default="")
+        if not raw_primary and raw_artists:
+            raw_primary = raw_artists.split(",")[0].strip()
+        if not raw_artists and raw_primary:
+            raw_artists = raw_primary
+
+        raw_album = get_val(r, "Album", default="")
+        raw_year = get_val(r, "Year", default="")
+        raw_release = get_val(r, "Release Date", default="")
+
+        # Duration
+        raw_dur_sec = get_val(r, "Duration (Seconds)", "Duration (Sec)", "Duration", default="0")
+        try:
+            dur_sec = int(float(raw_dur_sec))
+        except (ValueError, TypeError):
+            dur_sec = 0
+
+        raw_dur_fmt = get_val(r, "Duration (Formatted)", default="")
+        if not raw_dur_fmt and dur_sec > 0:
+            raw_dur_fmt = f"{dur_sec // 60:02d}:{dur_sec % 60:02d}"
+
+        # Track number
+        raw_track_no = get_val(r, "Track Number", "Track #", "Track", default=str(idx))
+        try:
+            track_num = int(raw_track_no)
+        except (ValueError, TypeError):
+            track_num = idx
+
+        has_lyrics_val = str(get_val(r, "Has Lyrics", default="false")).lower() in ("yes", "true", "1")
+
+        song_dict = {
+            "track_number": track_num,
+            "title": raw_title,
+            "all_artists": raw_artists,
+            "primary_artists": raw_primary,
+            "artist": raw_primary,
+            "album": raw_album,
+            "year": raw_year,
+            "release_date": raw_release,
+            "duration": dur_sec,
+            "duration_formatted": raw_dur_fmt or "00:00",
+            "bitrate": get_val(r, "Bitrate", default="320 kbps"),
+            "language": get_val(r, "Language", default=""),
+            "label": get_val(r, "Record Label", "Label", default=""),
+            "copyright": get_val(r, "Copyright", default=""),
+            "id": get_val(r, "JioSaavn ID", "Song ID", "ID", default=""),
+            "perma_url": get_val(r, "JioSaavn URL", "URL", "Link", default=""),
+            "image": get_val(r, "Album Art URL", "Image", "Cover", default=""),
+            "has_lyrics": has_lyrics_val,
+            "lyrics_snippet": get_val(r, "Lyrics Snippet", default=""),
+            "lyrics": get_val(r, "Full Lyrics", "Lyrics", default=""),
+            "yt_title": get_val(r, "YT Music Title", default=""),
+            "yt_video_id": get_val(r, "YT Music Video ID", "Video ID", default=""),
+            "yt_url": get_val(r, "YT Music URL", default=""),
+            "yt_match_score": get_val(r, "YT Match Score (%)", default=""),
+            "audio_source": get_val(r, "Audio Source", default=""),
+            "filename": get_val(r, "Filename", default=""),
+            "file_path": get_val(r, "File Path", default=""),
+            "download_status": get_val(r, "Download Status", default="Pending"),
+            "from_csv": True,
+        }
+        songs.append(song_dict)
+
+    collection_meta = {
+        "type": "csv",
+        "title": title,
+        "artist": songs[0]["primary_artists"] if songs else "",
+        "image": songs[0]["image"] if songs else "",
+        "count": len(songs),
+        "source": source_clean,
+    }
+    return collection_meta, songs
 
 
 class CSVExporter:

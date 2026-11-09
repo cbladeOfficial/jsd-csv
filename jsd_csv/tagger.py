@@ -5,6 +5,7 @@ Genre/Language, Record Label, Copyright, Lyrics, and high-resolution Album Art.
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 import requests
@@ -39,7 +40,7 @@ def embed_metadata(
     
     Args:
         mp3_file_path: Path to the .mp3 file.
-        song_metadata: Song metadata dict.
+        song_metadata: Song metadata dict (loaded on the fly or from CSV).
         lyrics: Clean full plaintext lyrics (optional).
         embed_cover: Whether to download and embed the high-res cover image.
         session: Requests session for downloading artwork.
@@ -59,7 +60,7 @@ def embed_metadata(
             tags.setall("TIT2", [TIT2(encoding=3, text=title)])
 
         # Artists
-        artists = song_metadata.get("all_artists") or song_metadata.get("primary_artists") or ""
+        artists = song_metadata.get("all_artists") or song_metadata.get("primary_artists") or song_metadata.get("artist") or ""
         if artists:
             tags.setall("TPE1", [TPE1(encoding=3, text=artists)])
 
@@ -74,7 +75,7 @@ def embed_metadata(
             tags.setall("TDRC", [TDRC(encoding=3, text=year)])
 
         # Track Number
-        track_num = song_metadata.get("track_number")
+        track_num = song_metadata.get("track_number") or song_metadata.get("track")
         if track_num:
             tags.setall("TRCK", [TRCK(encoding=3, text=str(track_num))])
 
@@ -106,15 +107,27 @@ def embed_metadata(
 
         # Album Art (APIC frame)
         if embed_cover:
-            img_url = song_metadata.get("image", "")
-            if img_url:
+            img_source = song_metadata.get("image", "") or song_metadata.get("album_art_url", "")
+            if img_source:
+                img_data = None
+                mime_type = "image/jpeg"
                 try:
-                    s = session or requests.Session()
-                    r = s.get(img_url, timeout=12)
-                    if r.status_code == 200 and r.content:
-                        mime_type = "image/jpeg"
-                        if "png" in img_url.lower():
+                    # 1. Local image file
+                    if os.path.exists(img_source) and os.path.isfile(img_source):
+                        with open(img_source, "rb") as f:
+                            img_data = f.read()
+                        if img_source.lower().endswith(".png"):
                             mime_type = "image/png"
+                    # 2. Remote image URL
+                    elif img_source.startswith(("http://", "https://")):
+                        s = session or requests.Session()
+                        r = s.get(img_source, timeout=12)
+                        if r.status_code == 200 and r.content:
+                            img_data = r.content
+                            if "png" in img_source.lower():
+                                mime_type = "image/png"
+
+                    if img_data:
                         tags.setall(
                             "APIC",
                             [
@@ -123,12 +136,12 @@ def embed_metadata(
                                     mime=mime_type,
                                     type=3,  # Front cover
                                     desc="Cover",
-                                    data=r.content,
+                                    data=img_data,
                                 )
                             ],
                         )
                 except Exception as e:
-                    logger.debug(f"Failed to download/embed album cover from {img_url}: {e}")
+                    logger.debug(f"Failed to embed album cover from {img_source}: {e}")
 
         tags.save(mp3_file_path, v2_version=3)
         return True

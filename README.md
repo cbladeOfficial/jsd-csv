@@ -9,7 +9,6 @@
  ╚════╝ ╚══════╝╚═════╝         ╚═════╝╚══════╝  ╚═══╝  
 ```
 
-
 ---
 
 ## 🌟 Key Features
@@ -17,14 +16,15 @@
 - **JioSaavn Direct Audio Extraction**: Fetches master audio streams directly from JioSaavn's CDN up to **320 kbps** (with automatic fallback to 160 kbps and 96 kbps).
 - **Exact YouTube Music Matching**: Searches YouTube Music for exact track matches using Title, Artist, Album, and Duration tolerance heuristics, calculating a match confidence score.
 - **YouTube Music Download Fallback**: If a JioSaavn direct stream is unavailable or geographically restricted, seamlessly falls back to downloading the matched audio from YouTube Music via `yt-dlp`.
-- **Rich CSV Metadata Archival**: Automatically exports all track details into an Excel/Google Sheets-friendly CSV file (`utf-8-sig`) saved directly in your output directory.
-- **Complete ID3v2 Tagging**: Automatically embeds Title, Artist(s), Album, Track Number, Year, Genre/Language, Publisher/Label, Copyright, Comment, **Full Lyrics (`USLT`)**, and **Crisp 500x500 Cover Art (`APIC`)** into MP3 files.
+- **Rich CSV Metadata Archival & Export**: Automatically exports all track details into an Excel/Google Sheets-friendly CSV file (`utf-8-sig`) saved directly in your output directory.
+- **Download Songs Later from CSV**: Import previously generated CSV files (local paths or online HTTP/HTTPS URLs) to download or re-download songs at any time.
+- **Complete ID3v2 Tagging**: Automatically embeds Title, Artist(s), Album, Track Number, Year, Genre/Language, Publisher/Label, Copyright, Comment, **Full Lyrics (`USLT`)**, and **Crisp 500x500 Cover Art (`APIC`)** into MP3 files—taking reference from the CSV or resolved on the fly.
 - **Customizable Filename Templates**: Format filenames using identifiers like `{Artist} - {Title}`, `{Album}/{Track} - {Title}`, `[{Year}] {Title}`, and more.
 - **3 Flexible Operational Modes**:
-  1. `all`: Download MP3 songs + Export CSV metadata (Default)
-  2. `songs`: Download MP3 songs only
-  3. `csv`: Export CSV metadata only (no audio files downloaded)
-- **Sleek Rich Console UI**: Features a modern terminal interface with interactive prompts, ASCII banners, collection summary panels, tracklist preview tables, and live multi-progress bars.
+  1. `all`: Download MP3 songs + Export/Update CSV metadata (Default)
+  2. `songs`: Download MP3 songs only (no CSV file)
+  3. `csv`: Export CSV metadata only (fast, no audio files downloaded)
+- **Sleek Rich Console UI**: Features a modern terminal interface with interactive prompts, collection summary panels, tracklist preview tables, and live multi-progress bars.
 - **Cookies Support**: Accepts user-provided `cookies.txt` files for authenticated YouTube Music downloads and bot-check bypassing.
 
 ---
@@ -93,9 +93,10 @@ Simply run the script with no arguments:
 ```bash
 python main.py
 ```
-*(Or `jsd-csv` if installed via pip)*
+*(Or `jsd-csv` / `jsd-csv.exe`)*
 
 You will be guided through:
+- **Pasting an existing CSV path or online URL** (optional, press Enter to skip and enter a link/query instead).
 - Entering a JioSaavn song, album, or playlist URL (or search query).
 - Selecting the output folder (default: `./downloads`).
 - Choosing the mode: `Songs + CSV`, `Songs only`, or `CSV only`.
@@ -120,6 +121,16 @@ python main.py [OPTIONS]
   python main.py -u "https://www.jiosaavn.com/song/kesariya/.../..." -o ./my_music
   ```
 
+- **Download songs from a local CSV file (with ID3 metadata & album art):**
+  ```bash
+  python main.py -f ./my_music/metadata.csv -o ./downloaded_songs
+  ```
+
+- **Download songs from an online CSV URL:**
+  ```bash
+  python main.py -f "https://raw.githubusercontent.com/user/repo/main/playlist.csv" -o ./songs
+  ```
+
 - **Download an entire album with track numbers in filenames:**
   ```bash
   python main.py -u "https://www.jiosaavn.com/album/rockstar/C3Br8V0qKrc_" -t "{track} - {title}" -o ./Rockstar
@@ -135,7 +146,7 @@ python main.py [OPTIONS]
   python main.py -u "https://www.jiosaavn.com/album/.../..." -m csv -o ./csv_reports
   ```
 
-- **Download audio files only without generating a CSV:**
+- **Download audio files only without generating a CSV (embeds tags & cover on the fly):**
   ```bash
   python main.py -u "https://www.jiosaavn.com/song/.../..." -m songs -o ./songs_only
   ```
@@ -152,6 +163,7 @@ python main.py [OPTIONS]
 | Switch | Long Flag | Description | Default |
 | :--- | :--- | :--- | :--- |
 | `-u` | `--url` | JioSaavn URL (song/album/playlist/artist) or search query | *None* |
+| `-f` | `--from-csv`, `--csv-input` | Path or URL to an existing CSV file to download songs from | *None* |
 | `-o` | `--output` | Destination output directory | `./downloads` |
 | `-m` | `--mode` | Operational mode: `all` (songs + CSV), `songs`, or `csv` | `all` |
 | `-t` | `--template` | Filename naming pattern (supports case-insensitive tokens) | `{artist} - {title}` |

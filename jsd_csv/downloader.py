@@ -1,13 +1,14 @@
 """
 Core Download and Processing Engine for JSD-CSV.
 Orchestrates metadata fetching, JioSaavn CDN streaming, FFmpeg transcoding,
-YouTube Music fallback matching, MP3 ID3 tagging, and CSV exporting.
+YouTube Music fallback matching, MP3 ID3 tagging, and CSV exporting/importing.
 """
 
 import logging
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -24,7 +25,7 @@ from rich.progress import (
 )
 
 from .api import JioSaavnAPI
-from .csv_exporter import CSVExporter
+from .csv_exporter import CSVExporter, load_csv
 from .formatter import format_filename
 from .tagger import embed_metadata
 from .ui import (
@@ -73,7 +74,7 @@ def check_ffmpeg() -> bool:
 
 
 class DownloaderEngine:
-    """Orchestrates track downloading, transcoding, tagging, and CSV generation."""
+    """Orchestrates track downloading, transcoding, tagging, and CSV generation/importing."""
 
     def __init__(
         self,
@@ -103,12 +104,18 @@ class DownloaderEngine:
         self.yt_matcher = YTMusicMatcher(cookies_file=self.cookies_file, ffmpeg_path=get_ffmpeg_path())
         self.session = requests.Session()
 
-    def run(self, input_target: str, auto_confirm: bool = False) -> Tuple[int, int, Optional[str]]:
+    def run(
+        self,
+        input_target: Optional[str] = None,
+        csv_source: Optional[str] = None,
+        auto_confirm: bool = False,
+    ) -> Tuple[int, int, Optional[str]]:
         """
         Executes the main pipeline.
         
         Args:
-            input_target: JioSaavn URL or search query.
+            input_target: JioSaavn URL, search query, or CSV path.
+            csv_source: Optional path or URL to an existing CSV file.
             auto_confirm: If True, skips interactive confirmation prompt.
             
         Returns:
@@ -120,20 +127,43 @@ class DownloaderEngine:
             console.print(
                 "[bold red]Error: FFmpeg is not installed or not found in system PATH.[/bold red]\n"
                 "[yellow]FFmpeg is required to transcode audio streams into high-quality MP3 format.[/yellow]\n"
-                "[dim]Please install FFmpeg or add it to your system PATH and try again.[/dim]"
+                "[dim]Please install FFmpeg or place ffmpeg.exe next to jsd-csv.exe and try again.[/dim]"
             )
             return 0, 0, None
 
-        # 1. Fetch metadata & resolve links
-        with console.status("[bold cyan]Fetching metadata from JioSaavn...[/bold cyan]", spinner="dots"):
-            try:
-                coll_meta, songs = self.api.resolve_and_fetch(input_target)
-            except Exception as e:
-                console.print(f"[bold red]Failed to fetch from JioSaavn:[/bold red] {e}")
+        # Determine if loading from CSV
+        active_csv_source = None
+        if csv_source and str(csv_source).strip():
+            active_csv_source = str(csv_source).strip()
+        elif input_target:
+            clean_tgt = str(input_target).strip().strip("'\"")
+            if clean_tgt.lower().endswith(".csv") or ".csv?" in clean_tgt.lower() or (os.path.exists(clean_tgt) and os.path.isfile(clean_tgt)):
+                active_csv_source = clean_tgt
+
+        coll_meta: Dict[str, Any] = {}
+        songs: List[Dict[str, Any]] = []
+
+        if active_csv_source:
+            with console.status(f"[bold cyan]Loading tracks from CSV: {active_csv_source}...[/bold cyan]", spinner="dots"):
+                try:
+                    coll_meta, songs = load_csv(active_csv_source)
+                except Exception as e:
+                    console.print(f"[bold red]Failed to load CSV file:[/bold red] {e}")
+                    return 0, 0, None
+        else:
+            if not input_target or not str(input_target).strip():
+                console.print("[bold red]Error: No URL, search query, or CSV input provided.[/bold red]")
                 return 0, 0, None
 
+            with console.status("[bold cyan]Fetching metadata from JioSaavn...[/bold cyan]", spinner="dots"):
+                try:
+                    coll_meta, songs = self.api.resolve_and_fetch(input_target)
+                except Exception as e:
+                    console.print(f"[bold red]Failed to fetch from JioSaavn:[/bold red] {e}")
+                    return 0, 0, None
+
         if not songs:
-            console.print("[bold red]No songs found for the given link or query.[/bold red]")
+            console.print("[bold red]No songs found to process.[/bold red]")
             return 0, 0, None
 
         # Display collection details and tracklist
@@ -143,7 +173,7 @@ class DownloaderEngine:
         if not auto_confirm:
             from rich.prompt import Confirm
             action_desc = {
-                "all": "download all audio tracks and export the CSV metadata",
+                "all": "download all audio tracks and update the CSV metadata",
                 "songs": "download all audio tracks",
                 "csv": "export the CSV metadata",
             }.get(self.mode, "proceed")
@@ -151,7 +181,7 @@ class DownloaderEngine:
                 console.print("[yellow]Operation cancelled by user.[/yellow]")
                 return 0, 0, None
 
-        # Prepare CSV filename based on collection if not specified
+        # Prepare CSV filename
         if not self.csv_filename:
             safe_title = coll_meta.get("title", "metadata").strip().replace(" ", "_")
             safe_title = "".join(c for c in safe_title if c.isalnum() or c in ("_", "-"))
@@ -181,30 +211,36 @@ class DownloaderEngine:
                 track_num = idx + 1
                 progress.update(main_task, description=f"[cyan][{track_num}/{total_tracks}][/cyan] {track_title[:30]}")
 
-                # 2. Fetch lyrics if needed
-                if self.fetch_lyrics and song.get("has_lyrics"):
-                    lyrics_id = song.get("lyrics_id")
-                    if lyrics_id:
-                        song["lyrics"] = self.api.get_lyrics(lyrics_id)
+                # If loaded from CSV, resolve any missing JioSaavn streams or details
+                if song.get("from_csv"):
+                    self._enrich_song_from_csv(song)
 
-                # 3. Search exact match on YouTube Music
-                try:
-                    yt_match = self.yt_matcher.search_exact_match(song)
-                    if yt_match:
-                        song["yt_title"] = yt_match.get("title", "")
-                        song["yt_video_id"] = yt_match.get("video_id", "")
-                        song["yt_url"] = yt_match.get("url", "")
-                        song["yt_match_score"] = yt_match.get("match_score", 0.0)
-                except Exception as e:
-                    logger.debug(f"YT Music match failed for {track_title}: {e}")
+                # Fetch lyrics if enabled and needed
+                if self.fetch_lyrics and not song.get("lyrics"):
+                    if song.get("has_lyrics") or song.get("lyrics_id"):
+                        lyrics_id = song.get("lyrics_id") or song.get("id")
+                        if lyrics_id:
+                            song["lyrics"] = self.api.get_lyrics(lyrics_id)
 
-                # 4. Handle audio download
+                # Search exact match on YouTube Music if not already recorded
+                if not song.get("yt_video_id"):
+                    try:
+                        yt_match = self.yt_matcher.search_exact_match(song)
+                        if yt_match:
+                            song["yt_title"] = yt_match.get("title", "")
+                            song["yt_video_id"] = yt_match.get("video_id", "")
+                            song["yt_url"] = yt_match.get("url", "")
+                            song["yt_match_score"] = yt_match.get("match_score", 0.0)
+                    except Exception as e:
+                        logger.debug(f"YT Music match failed for {track_title}: {e}")
+
+                # Audio download handling
                 song["bitrate"] = f"{self.quality} kbps"
                 if self.mode == "csv":
                     song["download_status"] = "CSV Only"
                     success_count += 1
                 else:
-                    # Download audio
+                    # Download audio & embed metadata tags + cover
                     ok = self._download_and_tag_track(song)
                     if ok:
                         song["download_status"] = "Downloaded"
@@ -216,7 +252,7 @@ class DownloaderEngine:
                 processed_records.append(song)
                 progress.advance(main_task)
 
-        # 5. Write CSV file
+        # Write or update CSV file
         csv_path = None
         if csv_exporter:
             try:
@@ -237,9 +273,48 @@ class DownloaderEngine:
 
         return total_tracks, success_count, csv_path
 
+    def _enrich_song_from_csv(self, song: Dict[str, Any]) -> None:
+        """Enriches a song loaded from CSV with stream URLs and album art if missing."""
+        if song.get("media_urls"):
+            return
+
+        # 1. Lookup by JioSaavn ID
+        song_id = song.get("id")
+        if song_id:
+            try:
+                res = self.api._call({"__call": "song.getDetails", "pids": song_id})
+                api_songs = res.get("songs", [])
+                if api_songs:
+                    formatted = self.api.format_song_item(api_songs[0], song.get("track_number", 1))
+                    if formatted.get("media_urls"):
+                        song["media_urls"] = formatted["media_urls"]
+                        song["decrypted_media_url"] = formatted["decrypted_media_url"]
+                    if not song.get("image") and formatted.get("image"):
+                        song["image"] = formatted["image"]
+                    if not song.get("lyrics") and formatted.get("lyrics"):
+                        song["lyrics"] = formatted["lyrics"]
+                    return
+            except Exception as e:
+                logger.debug(f"Failed to lookup song by ID {song_id}: {e}")
+
+        # 2. Lookup by JioSaavn URL
+        perma_url = song.get("perma_url")
+        if perma_url and ("jiosaavn.com" in perma_url or "saa.vn" in perma_url):
+            try:
+                _, api_songs = self.api.resolve_and_fetch(perma_url)
+                if api_songs:
+                    formatted = api_songs[0]
+                    if formatted.get("media_urls"):
+                        song["media_urls"] = formatted["media_urls"]
+                        song["decrypted_media_url"] = formatted["decrypted_media_url"]
+                    if not song.get("image") and formatted.get("image"):
+                        song["image"] = formatted["image"]
+                    return
+            except Exception as e:
+                logger.debug(f"Failed to lookup song by URL {perma_url}: {e}")
+
     def _download_and_tag_track(self, song: Dict[str, Any]) -> bool:
         """Downloads audio via JioSaavn direct or YT Music fallback, transcodes to MP3, and embeds tags."""
-        # Compute destination filename
         rel_filename = format_filename(self.template, song)
         dest_mp3 = os.path.join(self.output_dir, f"{rel_filename}.mp3")
         os.makedirs(os.path.dirname(dest_mp3), exist_ok=True)
@@ -247,9 +322,17 @@ class DownloaderEngine:
         song["filename"] = f"{os.path.basename(rel_filename)}.mp3"
         song["file_path"] = os.path.abspath(dest_mp3)
 
-        # Skip if already exists
+        # Skip download if already exists and non-empty
         if os.path.exists(dest_mp3) and os.path.getsize(dest_mp3) > 1024:
             song["audio_source"] = "Existing File"
+            # Ensure tags and cover are up to date
+            embed_metadata(
+                mp3_file_path=dest_mp3,
+                song_metadata=song,
+                lyrics=song.get("lyrics"),
+                embed_cover=self.embed_cover,
+                session=self.session,
+            )
             return True
 
         downloaded_source = None
@@ -263,6 +346,13 @@ class DownloaderEngine:
         # Strategy 2: Fallback to YouTube Music
         if not downloaded_source and self.source in ("auto", "ytmusic"):
             yt_id = song.get("yt_video_id")
+            if not yt_id:
+                yt_match = self.yt_matcher.search_exact_match(song)
+                if yt_match:
+                    yt_id = yt_match.get("video_id")
+                    song["yt_video_id"] = yt_id
+                    song["yt_url"] = yt_match.get("url")
+                    song["yt_title"] = yt_match.get("title")
             if yt_id:
                 yt_ok = self._try_ytmusic_download(yt_id, dest_mp3)
                 if yt_ok:
@@ -273,7 +363,7 @@ class DownloaderEngine:
 
         song["audio_source"] = downloaded_source
 
-        # Embed ID3 tags and album cover
+        # Embed complete ID3 metadata, lyrics, and album cover
         embed_metadata(
             mp3_file_path=dest_mp3,
             song_metadata=song,
@@ -290,7 +380,6 @@ class DownloaderEngine:
         if not media_urls:
             return False
 
-        # Try chosen bitrate, then fallback bitrates
         bitrate_order = [self.quality] + [q for q in ["320", "160", "96"] if q != self.quality]
 
         cdn_url = None
@@ -311,7 +400,6 @@ class DownloaderEngine:
         if not cdn_url:
             return False
 
-        # Download stream to temporary MP4 file
         temp_dir = tempfile.gettempdir()
         temp_in = os.path.join(temp_dir, f"jsd_temp_{song.get('id', 'temp')}.mp4")
 
@@ -326,7 +414,6 @@ class DownloaderEngine:
             if not os.path.exists(temp_in) or os.path.getsize(temp_in) < 1000:
                 return False
 
-            # Transcode to high-quality MP3 via FFmpeg
             ffmpeg_bin = get_ffmpeg_path() or "ffmpeg"
             cmd = [
                 ffmpeg_bin,

@@ -39,7 +39,6 @@ BANNER_ART = r"""
 """
 
 
-
 def print_banner() -> None:
     """Renders the sleek JSD-CSV banner in cyan and violet."""
     title_text = Text(BANNER_ART, style="bold cyan")
@@ -61,12 +60,26 @@ def prompt_interactive_options() -> Dict[str, Any]:
     console.print("[bold yellow]❯ Interactive Configuration Wizard[/bold yellow]")
     console.print("[dim]Enter the details below or press Enter to accept the defaults.[/dim]\n")
 
-    # 1. URL or Search Query
-    while True:
-        url_input = Prompt.ask("[bold bright_green]?[/bold bright_green] [bold]Enter JioSaavn Link or Search Query[/bold]")
-        if url_input.strip():
-            break
-        console.print("[red]Input cannot be empty. Please enter a valid link or query.[/red]")
+    # 1. CSV Path or URL (optional)
+    console.print("[dim]You can paste a path or URL to an existing CSV file to download songs from,")
+    console.print("or leave it blank to enter a JioSaavn link/query instead.[/dim]")
+    csv_input = Prompt.ask(
+        "[bold bright_green]?[/bold bright_green] [bold]CSV Path or Online URL (optional, press Enter to skip)[/bold]",
+        default="",
+    ).strip().strip("'\"")
+
+    url_input = ""
+    if not csv_input:
+        while True:
+            url_input = Prompt.ask("[bold bright_green]?[/bold bright_green] [bold]Enter JioSaavn Link or Search Query[/bold]")
+            if url_input.strip():
+                break
+            console.print("[red]Input cannot be empty. Please enter a valid link, query, or CSV path.[/red]")
+        # Check if the user entered a CSV into the link prompt
+        clean_url = url_input.strip().strip("'\"")
+        if clean_url.lower().endswith(".csv") or ".csv?" in clean_url.lower() or (os.path.exists(clean_url) and os.path.isfile(clean_url)):
+            csv_input = clean_url
+            url_input = ""
 
     # 2. Output Directory
     out_dir = Prompt.ask(
@@ -76,9 +89,9 @@ def prompt_interactive_options() -> Dict[str, Any]:
 
     # 3. Mode Selection
     console.print("\n[bold]Select Operation Mode:[/bold]")
-    console.print("  [cyan]1[/cyan]) [bold]Both[/bold] (Download MP3s + Export CSV Metadata) [green][Recommended][/green]")
-    console.print("  [cyan]2[/cyan]) [bold]Songs Only[/bold] (Download MP3s without CSV)")
-    console.print("  [cyan]3[/cyan]) [bold]CSV Only[/bold] (Export CSV Metadata without downloading audio)")
+    console.print("  [cyan]1[/cyan]) [bold]Both[/bold] (Download MP3s + Export/Update CSV Metadata) [green][Recommended][/green]")
+    console.print("  [cyan]2[/cyan]) [bold]Songs Only[/bold] (Download MP3s without updating CSV)")
+    console.print("  [cyan]3[/cyan]) [bold]CSV Only[/bold] (Export/Sync CSV Metadata without downloading audio)")
     mode_choice = Prompt.ask(
         "[bold bright_green]?[/bold bright_green] [bold]Mode[/bold]",
         choices=["1", "2", "3"],
@@ -139,6 +152,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
     console.print()
     return {
         "url": url_input.strip(),
+        "csv": csv_input.strip(),
         "output": out_dir.strip(),
         "mode": selected_mode,
         "quality": selected_quality,
@@ -152,18 +166,27 @@ def prompt_interactive_options() -> Dict[str, Any]:
 
 def display_collection_header(meta: Dict[str, Any]) -> None:
     """Displays collection header details before track listing."""
-    coll_type = meta.get("type", "Collection").capitalize()
+    raw_type = meta.get("type", "Collection")
     title = meta.get("title", "Unknown")
     artist = meta.get("artist", "")
     count = meta.get("count", 0)
+    source = meta.get("source", "")
 
     header_text = Text()
-    header_text.append(f"{coll_type}: ", style="bold bright_blue")
-    header_text.append(title, style="bold bright_white")
-    if artist:
-        header_text.append(f"  •  Artist: ", style="bold cyan")
-        header_text.append(artist, style="bright_white")
-    header_text.append(f"  •  Total Tracks: ", style="bold green")
+    if raw_type.lower() == "csv":
+        header_text.append("CSV Batch: ", style="bold bright_blue")
+        header_text.append(title, style="bold bright_white")
+        if source:
+            header_text.append("  •  Source: ", style="bold cyan")
+            header_text.append(source[:55] + ("..." if len(source) > 55 else ""), style="bright_white")
+    else:
+        header_text.append(f"{raw_type.capitalize()}: ", style="bold bright_blue")
+        header_text.append(title, style="bold bright_white")
+        if artist:
+            header_text.append("  •  Artist: ", style="bold cyan")
+            header_text.append(artist, style="bright_white")
+            
+    header_text.append("  •  Total Tracks: ", style="bold green")
     header_text.append(str(count), style="bold yellow")
 
     console.print(Panel(header_text, border_style="bright_blue"))
@@ -187,11 +210,11 @@ def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> Non
 
     display_list = songs[:max_rows]
     for idx, s in enumerate(display_list):
-        lyrics_icon = "[green]✓[/green]" if s.get("has_lyrics") else "[dim]—[/dim]"
+        lyrics_icon = "[green]✓[/green]" if s.get("has_lyrics") or s.get("lyrics") else "[dim]—[/dim]"
         table.add_row(
             str(s.get("track_number") or idx + 1),
             s.get("title", "Unknown")[:35],
-            s.get("primary_artists", "Unknown")[:28],
+            (s.get("primary_artists") or s.get("artist") or "Unknown")[:28],
             s.get("album", "Unknown")[:25],
             s.get("duration_formatted", "00:00"),
             lyrics_icon,

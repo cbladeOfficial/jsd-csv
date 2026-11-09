@@ -26,6 +26,12 @@ Examples:
   # Download single song with CSV at 320 kbps:
   jsd-csv -u "https://www.jiosaavn.com/song/.../..." -o ./my_songs
 
+  # Download songs from a local CSV file:
+  jsd-csv -f ./my_songs/metadata.csv -o ./downloaded_music
+
+  # Download songs from an online CSV URL:
+  jsd-csv -f "https://example.com/playlist.csv" -o ./downloaded_music
+
   # Download entire album with custom filename template:
   jsd-csv -u "https://www.jiosaavn.com/album/.../..." -t "{track} - {title}" -o ./album
 
@@ -55,6 +61,14 @@ Supported Filename Identifiers:
         type=str,
         default=None,
         help="JioSaavn URL (song, album, playlist, artist) or search query.",
+    )
+
+    parser.add_argument(
+        "-f", "--from-csv", "--csv-input",
+        dest="from_csv",
+        type=str,
+        default=None,
+        help="Path or URL to an existing CSV file to load and download tracks from (optional).",
     )
 
     parser.add_argument(
@@ -181,7 +195,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     print_banner()
 
     # Determine whether to run interactive mode
-    if args.interactive or not args.url:
+    if args.interactive or (not args.url and not args.from_csv):
         config = prompt_interactive_options()
         engine = DownloaderEngine(
             output_dir=config["output"],
@@ -193,7 +207,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             embed_cover=config["cover"],
             cookies_file=config["cookies"],
         )
-        total, success, csv_path = engine.run(config["url"], auto_confirm=False)
+        total, success, csv_path = engine.run(
+            input_target=config.get("url"),
+            csv_source=config.get("csv"),
+            auto_confirm=False,
+        )
     else:
         engine = DownloaderEngine(
             output_dir=args.output,
@@ -206,7 +224,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             cookies_file=args.cookies,
             csv_filename=args.csv_name,
         )
-        total, success, csv_path = engine.run(args.url, auto_confirm=args.yes)
+        total, success, csv_path = engine.run(
+            input_target=args.url,
+            csv_source=args.from_csv,
+            auto_confirm=args.yes,
+        )
 
     return 0 if (total > 0 and success > 0) or (args.mode == "csv" and total > 0) else 1
 
