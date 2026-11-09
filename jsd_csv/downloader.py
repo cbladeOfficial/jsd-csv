@@ -38,9 +38,38 @@ from .ytmusic import YTMusicMatcher
 logger = logging.getLogger(__name__)
 
 
+def get_ffmpeg_path() -> Optional[str]:
+    """Resolves FFmpeg path from system PATH, executable folder, or PyInstaller bundle."""
+    # 1. Check system PATH
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+
+    binary_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+
+    # 2. Check PyInstaller _MEIPASS bundle
+    if hasattr(sys, "_MEIPASS"):
+        bundle_path = os.path.join(sys._MEIPASS, binary_name)
+        if os.path.exists(bundle_path):
+            return bundle_path
+
+    # 3. Check directory of running executable or script
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__))
+    exe_ffmpeg = os.path.join(exe_dir, binary_name)
+    if os.path.exists(exe_ffmpeg):
+        return exe_ffmpeg
+
+    # 4. Check current working directory
+    cwd_ffmpeg = os.path.join(os.getcwd(), binary_name)
+    if os.path.exists(cwd_ffmpeg):
+        return cwd_ffmpeg
+
+    return None
+
+
 def check_ffmpeg() -> bool:
-    """Checks if FFmpeg executable is accessible in PATH."""
-    return shutil.which("ffmpeg") is not None
+    """Checks if FFmpeg executable is accessible."""
+    return get_ffmpeg_path() is not None
 
 
 class DownloaderEngine:
@@ -71,7 +100,7 @@ class DownloaderEngine:
         os.makedirs(self.output_dir, exist_ok=True)
 
         self.api = JioSaavnAPI()
-        self.yt_matcher = YTMusicMatcher(cookies_file=self.cookies_file)
+        self.yt_matcher = YTMusicMatcher(cookies_file=self.cookies_file, ffmpeg_path=get_ffmpeg_path())
         self.session = requests.Session()
 
     def run(self, input_target: str, auto_confirm: bool = False) -> Tuple[int, int, Optional[str]]:
@@ -298,8 +327,9 @@ class DownloaderEngine:
                 return False
 
             # Transcode to high-quality MP3 via FFmpeg
+            ffmpeg_bin = get_ffmpeg_path() or "ffmpeg"
             cmd = [
-                "ffmpeg",
+                ffmpeg_bin,
                 "-y",
                 "-i", temp_in,
                 "-vn",

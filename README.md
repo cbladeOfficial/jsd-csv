@@ -40,7 +40,26 @@
 
 ---
 
-## 🚀 Installation
+## 🚀 Installation & Executable Build
+
+### Option A: Use the Standalone Windows Executable (.exe)
+You can build a standalone single-file `.exe` that does not require Python:
+
+```bash
+# Double click build.bat or run:
+pyinstaller --noconfirm --clean jsd-csv.spec
+```
+
+The resulting executable will be in the **`dist/`** directory:
+```
+dist/jsd-csv.exe
+```
+
+You can move `jsd-csv.exe` anywhere! For complete portability across systems without FFmpeg installed globally, simply place `ffmpeg.exe` in the same directory as `jsd-csv.exe`. JSD-CSV automatically detects and utilizes local FFmpeg binaries next to the executable.
+
+---
+
+### Option B: Python Installation (Source)
 
 Clone or navigate to the repository directory:
 

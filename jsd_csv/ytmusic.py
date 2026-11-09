@@ -50,8 +50,9 @@ def parse_duration_to_seconds(dur_str: str) -> int:
 class YTMusicMatcher:
     """Finds exact track matches on YouTube Music with confidence scoring."""
 
-    def __init__(self, cookies_file: Optional[str] = None):
+    def __init__(self, cookies_file: Optional[str] = None, ffmpeg_path: Optional[str] = None):
         self.cookies_file = cookies_file if (cookies_file and os.path.exists(cookies_file)) else None
+        self.ffmpeg_path = ffmpeg_path
         try:
             self.ytm = YTMusic()
         except Exception as e:
@@ -250,6 +251,9 @@ class YTMusicMatcher:
 
         if self.cookies_file:
             ydl_opts["cookiefile"] = self.cookies_file
+
+        if self.ffmpeg_path:
+            ydl_opts["ffmpeg_location"] = self.ffmpeg_path
 
         if progress_hook:
             ydl_opts["progress_hooks"] = [progress_hook]
