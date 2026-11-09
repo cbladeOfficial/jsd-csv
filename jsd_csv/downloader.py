@@ -194,22 +194,22 @@ class DownloaderEngine:
         failed_count = 0
         processed_records: List[Dict[str, Any]] = []
 
-        # Rich Progress Bar setup
+        # Rich Progress Bar setup with vivid color styling
         with Progress(
-            SpinnerColumn(),
+            SpinnerColumn(spinner_name="dots12", style="bold #d946ef"),
             TextColumn("[bold bright_white]{task.description}[/bold bright_white]"),
-            BarColumn(complete_style="cyan", finished_style="green"),
-            TaskProgressColumn(),
+            BarColumn(complete_style="bold #c084fc", finished_style="bold #4ade80", pulse_style="bold #38bdf8"),
+            TaskProgressColumn(text_format="[bold #facc15]{task.percentage:>3.0f}%[/bold #facc15]"),
             MofNCompleteColumn(),
-            TimeRemainingColumn(),
+            TimeRemainingColumn(compact=True),
             console=console,
         ) as progress:
-            main_task = progress.add_task("[cyan]Processing tracks...", total=total_tracks)
+            main_task = progress.add_task("[bold #38bdf8]▶ Processing tracks...[/bold #38bdf8]", total=total_tracks)
 
             for idx, song in enumerate(songs):
                 track_title = song.get("title", "Unknown")
                 track_num = idx + 1
-                progress.update(main_task, description=f"[cyan][{track_num}/{total_tracks}][/cyan] {track_title[:30]}")
+                progress.update(main_task, description=f"[bold #38bdf8]▶ [{track_num}/{total_tracks}][/bold #38bdf8] [bold bright_white]{track_title[:32]}[/bold bright_white]")
 
                 # If loaded from CSV, resolve any missing JioSaavn streams or details
                 if song.get("from_csv"):
