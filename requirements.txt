@@ -1,0 +1,7 @@
+requests>=2.31.0
+rich>=13.0.0
+mutagen>=1.47.0
+yt-dlp>=2024.0.0
+ytmusicapi>=1.7.0
+pycryptodome>=3.20.0
+rapidfuzz>=3.0.0

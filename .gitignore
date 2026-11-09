@@ -1,0 +1,24 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Downloaded files and exports
+downloads/
+*.mp3
+*.m4a
+*.mp4
+*.csv
+
+# Temporary files & Cookies
+*.tmp
+*.log
+cookies.txt
+
+# Virtual environments
+venv/
+.venv/
+env/
