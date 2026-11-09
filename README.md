@@ -9,7 +9,6 @@
  ╚════╝ ╚══════╝╚═════╝         ╚═════╝╚══════╝  ╚═══╝  
 ```
 
-> **Educational & Learning Project**: **JSD-CSV** is developed strictly for **educational and research purposes** to demonstrate API interaction, DES decryption, cryptographic stream resolution, metadata extraction, YouTube Music confidence matching, audio transcoding with FFmpeg, Mutagen ID3 tagging, and automated CSV archiving.
 
 ---
 
@@ -243,6 +242,6 @@ If you experience YouTube Music rate limiting or bot verification prompts during
 
 ---
 
-## ⚖️ License & Educational Disclaimer
+## ⚖️ License
 
-This project is released under the **MIT License**. It was developed solely for **educational, academic, and learning purposes** to study audio stream protocols, ID3 tagging standards, and data archiving. Users are responsible for complying with the terms of service of the respective platforms and all relevant copyright laws.
+This project is released under the **MIT License**.

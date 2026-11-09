@@ -38,11 +38,6 @@ BANNER_ART = r"""
  ╚════╝ ╚══════╝╚═════╝         ╚═════╝╚══════╝  ╚═══╝  
 """
 
-DISCLAIMER_TEXT = (
-    "[dim]DISCLAIMER: JSD-CSV (Jio Saavn Downloader - with CSV) is developed strictly for "
-    "[bold cyan]educational and learning purposes[/bold cyan]. "
-    "Please respect artist copyrights and content licensing in accordance with your local jurisdiction.[/dim]"
-)
 
 
 def print_banner() -> None:
@@ -55,7 +50,6 @@ def print_banner() -> None:
         padding=(0, 2),
     )
     console.print(banner_panel)
-    console.print(Panel(Align.center(DISCLAIMER_TEXT), border_style="dim", padding=(0, 1)))
     console.print()
 
 

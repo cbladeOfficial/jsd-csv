@@ -1,6 +1,6 @@
 """
 JSD-CSV: Jio Saavn Downloader - (with) CSV
-Educational and learning tool for fetching, archiving, and cataloging music metadata
+CLI tool for fetching, archiving, and cataloging music metadata
 from JioSaavn with exact YouTube Music fallback matching and MP3 tagging.
 """
 

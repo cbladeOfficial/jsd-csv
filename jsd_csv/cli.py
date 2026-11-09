@@ -16,7 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Builds the CLI argument parser with all flags and help descriptions."""
     parser = argparse.ArgumentParser(
         prog="jsd-csv",
-        description=f"{__app_name__}: {__description__} (Educational Purpose Only)",
+        description=f"{__app_name__}: {__description__}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jsd-csv"
 version = "1.0.0"
-description = "JSD-CSV: Jio Saavn Downloader - (with) CSV. Educational MP3 downloader with high-res metadata, YouTube Music fallback matching, customizable naming, and CSV exports."
+description = "JSD-CSV: Jio Saavn Downloader - (with) CSV. High-performance MP3 downloader with high-res metadata, YouTube Music fallback matching, customizable naming, and CSV exports."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
     { name = "JSD-CSV Team" }
 ]
-keywords = ["jiosaavn", "downloader", "csv", "ytmusic", "mp3", "music-downloader", "educational"]
+keywords = ["jiosaavn", "downloader", "csv", "ytmusic", "mp3", "music-downloader"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
