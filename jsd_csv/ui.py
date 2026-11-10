@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from rich import box
 from rich.align import Align
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
@@ -34,44 +34,65 @@ def make_box_badge(text: str, bg_color: str, fg_color: str = "white", width: Opt
 
 
 def render_gradient_banner() -> Panel:
-    """Builds a crisp, perfectly aligned two-tone gradient ASCII banner with solid box badges."""
+    """Builds a crisp, left-aligned, two-tone gradient ASCII banner with solid box badges."""
     banner_lines = [
-        r"    ██╗███████╗██████╗        ██████╗███████╗██╗   ██╗",
-        r"    ██║██╔════╝██╔══██╗      ██╔════╝██╔════╝██║   ██║",
-        r"    ██║███████╗██║  ██║█████╗██║     ███████╗██║   ██║",
-        r"    ██║╚════██║██║  ██║╚════╝██║     ╚════██║╚██╗ ██╔╝",
-        r"██████║███████║██████╔╝      ╚██████╗███████║ ╚████╔╝ ",
-        r"╚═════╝╚══════╝╚═════╝        ╚═════╝╚══════╝  ╚═══╝  ",
+        r"███████╗███████╗██████╗        ██████╗███████╗██╗   ██╗",
+        r"╚══███╔╝██╔════╝██╔══██╗      ██╔════╝██╔════╝██║   ██║",
+        r"   ███║ ███████╗██║  ██║█████╗██║     ███████╗██║   ██║",
+        r"   ███║ ╚════██║██║  ██║╚════╝██║     ╚════██║╚██╗ ██╔╝",
+        r"██████║ ███████║██████╔╝      ╚██████╗███████║ ╚████╔╝ ",
+        r"╚═════╝ ╚══════╝╚═════╝        ╚═════╝╚══════╝  ╚═══╝  ",
     ]
 
-    banner = Text()
+    ascii_text = Text()
     for line in banner_lines:
-        banner.append(line[:23], style="bold #00f0ff")
-        banner.append(line[23:30], style="bold bright_white")
-        banner.append(line[30:], style="bold #d946ef")
-        banner.append("\n")
+        ascii_text.append(line[:24], style="bold #00f0ff")
+        ascii_text.append(line[24:30], style="bold bright_white")
+        ascii_text.append(line[30:], style="bold #d946ef")
+        ascii_text.append("\n")
 
-    banner.append("\n")
-    banner.append(" JioSaavn Downloader with CSV ", style="bold bright_white")
-    banner.append(" | ", style="bold #facc15")
-    banner.append("v1.0.0\n\n", style="bold bright_cyan")
+    sub_text = Text()
+    sub_text.append("JioSaavn Downloader with CSV", style="bold bright_white")
+    sub_text.append("  |  ", style="bold #facc15")
+    sub_text.append("v1.0.0", style="bold bright_cyan")
 
-    # Complete solid boxes (no brackets, decent spacing)
-    banner.append("  320 KBPS  ", style="bold white on #0284c7")
-    banner.append("   ", style="default")
-    banner.append("  YT MUSIC FALLBACK  ", style="bold white on #7c3aed")
-    banner.append("   ", style="default")
-    banner.append("  CSV BATCH  ", style="bold white on #059669")
-    banner.append("   ", style="default")
-    banner.append("  ID3 + ART  ", style="bold white on #d97706")
-    banner.append("   ", style="default")
-    banner.append("  FULL LYRICS  ", style="bold white on #e11d48")
+    badges_text = Text()
+    if console.width >= 95:
+        items = [
+            ("  320 KBPS  ", "bold white on #0284c7"),
+            ("  YT MUSIC FALLBACK  ", "bold white on #7c3aed"),
+            ("  CSV BATCH  ", "bold white on #059669"),
+            ("  ID3 + ART  ", "bold white on #d97706"),
+            ("  FULL LYRICS  ", "bold white on #e11d48"),
+        ]
+        sep = "   "
+    else:
+        items = [
+            (" 320 KBPS ", "bold white on #0284c7"),
+            (" YT MUSIC ", "bold white on #7c3aed"),
+            (" CSV BATCH ", "bold white on #059669"),
+            (" ID3 + ART ", "bold white on #d97706"),
+            (" LYRICS ", "bold white on #e11d48"),
+        ]
+        sep = "  "
+
+    for idx, (label, style) in enumerate(items):
+        if idx > 0:
+            badges_text.append(sep, style="default")
+        badges_text.append(label, style=style)
+
+    banner_group = Group(
+        ascii_text,
+        sub_text,
+        Text(""),
+        badges_text,
+    )
 
     return Panel(
-        Align.center(banner),
+        banner_group,
         box=box.ROUNDED,
         border_style="bright_blue",
-        padding=(1, 3),
+        padding=(1, 3 if console.width >= 95 else 2),
     )
 
 
