@@ -173,8 +173,13 @@ def make_stage_desc(stage: str, bg_color: str, title: str, box_w: int = 10, max_
     """
     Builds a centered lifecycle stage box with solid background color (no brackets),
     followed by generous spacing and a neatly padded title.
+    Guarantees perfectly balanced horizontal padding on both sides.
     """
-    box_str = f"[bold white on {bg_color}]{stage.center(box_w)}[/]"
+    total_pad = max(0, box_w - len(stage))
+    left_pad = total_pad // 2
+    right_pad = total_pad - left_pad
+    badge_label = f"{' ' * left_pad}{stage}{' ' * right_pad}"
+    box_str = f"[bold white on {bg_color}]{badge_label}[/]"
     clean_title = (title[: max_len - 3] + "...") if len(title) > max_len else title.ljust(max_len)
     return f"{box_str}  [bold bright_white]{clean_title}[/]"
 
@@ -326,12 +331,12 @@ class DownloaderEngine:
             console=console,
         ) as progress:
             overall_task = progress.add_task(
-                make_stage_desc("OVERALL", "#475569", "Collection", box_w=box_w, max_len=title_w),
+                make_stage_desc("PROGRESS", "#475569", "Collection", box_w=box_w, max_len=title_w),
                 total=total_tracks,
                 unit="tracks",
             )
             track_task = progress.add_task(
-                make_stage_desc("START", "#0891b2", "Waiting", box_w=box_w, max_len=title_w),
+                make_stage_desc("QUEUED", "#0891b2", "Waiting", box_w=box_w, max_len=title_w),
                 total=100,
                 unit="step",
                 step_text="Waiting",
@@ -346,7 +351,7 @@ class DownloaderEngine:
                 track_title = song.get("title", "Unknown")
                 progress.update(
                     track_task,
-                    description=make_stage_desc("START", "#0891b2", track_title, box_w=box_w, max_len=title_w),
+                    description=make_stage_desc("QUEUED", "#0891b2", track_title, box_w=box_w, max_len=title_w),
                     completed=0,
                     total=100,
                     unit="step",
@@ -568,7 +573,7 @@ class DownloaderEngine:
         if progress and track_task is not None:
             progress.update(
                 track_task,
-                description=make_stage_desc("TAGGING", "#d97706", track_title, box_w=box_w, max_len=title_len),
+                description=make_stage_desc("METADATA", "#d97706", track_title, box_w=box_w, max_len=title_len),
                 unit="step",
                 step_text="ID3+Art",
                 completed=90,
@@ -659,7 +664,7 @@ class DownloaderEngine:
             if progress and track_task is not None:
                 progress.update(
                     track_task,
-                    description=make_stage_desc("CONVERT", "#9333ea", track_title, box_w=box_w, max_len=title_len),
+                    description=make_stage_desc("ENCODING", "#9333ea", track_title, box_w=box_w, max_len=title_len),
                     unit="step",
                     step_text=f"{self.quality}k MP3",
                     completed=100,
@@ -726,7 +731,7 @@ class DownloaderEngine:
             elif status == "finished":
                 progress.update(
                     track_task,
-                    description=make_stage_desc("CONVERT", "#9333ea", track_title, box_w=box_w, max_len=title_len),
+                    description=make_stage_desc("ENCODING", "#9333ea", track_title, box_w=box_w, max_len=title_len),
                     unit="step",
                     step_text=f"{self.quality}k MP3",
                     completed=100,

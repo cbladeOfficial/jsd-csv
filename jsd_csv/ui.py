@@ -31,7 +31,13 @@ console = Console(legacy_windows=False)
 
 def make_box_badge(text: str, bg_color: str, fg_color: str = "white", width: Optional[int] = None) -> Text:
     """Builds a complete solid colored box with centered text (no brackets)."""
-    label = text.center(width) if width else f"  {text}  "
+    if width and width > len(text):
+        total_pad = width - len(text)
+        left_pad = total_pad // 2
+        right_pad = total_pad - left_pad
+        label = f"{' ' * left_pad}{text}{' ' * right_pad}"
+    else:
+        label = f"  {text}  "
     return Text(label, style=f"bold {fg_color} on {bg_color}")
 
 
@@ -114,7 +120,7 @@ def render_step_header(
 ) -> None:
     """Renders an elegant, spacious step card header with solid box step badge."""
     console.print()
-    step_box = Text(f" STEP {step_num} ".center(10), style="bold white on #6366f1")
+    step_box = Text(f"  STEP {step_num}  ", style="bold white on #6366f1")
     header = Text()
     header.append_text(step_box)
     header.append("  ")
@@ -525,14 +531,18 @@ def display_summary_report(
 ) -> None:
     """Renders a sleek, colorful dashboard summary card with consistent-width solid boxes and generous spacing."""
     def make_badge(text: str, bg: str, width: int = 14) -> str:
-        return f"[bold white on {bg}]{text.center(width)}[/]"
+        total_pad = max(0, width - len(text))
+        left_pad = total_pad // 2
+        right_pad = total_pad - left_pad
+        label = f"{' ' * left_pad}{text}{' ' * right_pad}"
+        return f"[bold white on {bg}]{label}[/]"
 
     summary_table = Table.grid(padding=(0, 4))
     summary_table.add_column(justify="left")
     summary_table.add_column(style="bright_white")
 
     summary_table.add_row(
-        make_badge("COMPLETED", "#16a34a", 14),
+        make_badge("COMPLETE", "#16a34a", 14),
         f"[bold bright_green]{success_count}[/] / [bold bright_white]{total}[/] tracks successfully processed",
     )
     if failed_count > 0:
