@@ -167,6 +167,7 @@ python main.py [OPTIONS]
 | `-o` | `--output` | Destination output directory | `./downloads` |
 | `-m` | `--mode` | Operational mode: `all` (songs + CSV), `songs`, or `csv` | `all` |
 | `-t` | `--template` | Filename naming pattern (supports case-insensitive tokens) | `{artist} - {title}` |
+| | `--artists-separator` | Separator between multiple artists in `{artists}` tag (e.g. `", "`, `","`, `" & "`) | `", "` |
 | `-q` | `--quality` | Target audio bitrate: `320`, `160`, or `96` kbps | `320` |
 | `-s` | `--source` | Audio stream source: `auto`, `saavn`, or `ytmusic` | `auto` |
 | `-c` | `--cookies` | Path to Netscape-format `cookies.txt` file for YouTube Music | *None* |
@@ -191,7 +192,7 @@ Identifiers are **case-insensitive**, support both hyphens and underscores (e.g.
 | :--- | :--- | :--- |
 | `{title}` | Song title (aliases: `{song}`, `{name}`) | `Kesariya` |
 | `{artist}` | Primary lead artist (alias: `{primary_artist}`) | `Arijit Singh` |
-| `{artists}` | All track artists comma-separated (alias: `{all_artists}`) | `Pritam, Arijit Singh, Amitabh Bhattacharya` |
+| `{artists}` | All track artists joined by separator (default: `, ` or configurable via `--artists-separator`) | `Pritam, Arijit Singh, Amitabh Bhattacharya` |
 | `{album_artist}` | Album artist / primary composer (`{albumartist}`, `{album-artist}`) | `Pritam` |
 | `{album}` | Album name (alias: `{album_name}`) | `Brahmastra` |
 | `{year}` | 4-digit release year (`{release_year}`) | `2022` |
@@ -213,6 +214,7 @@ Identifiers are **case-insensitive**, support both hyphens and underscores (e.g.
 - `{artist} - {title}` &rarr; `Arijit Singh - Kesariya.mp3`
 - `{album_artist}/{album}/{track} - {title}` &rarr; `Pritam/Brahmastra/01 - Kesariya.mp3`
 - `[{year}] {artists} - {title}` &rarr; `[2022] Pritam, Arijit Singh, Amitabh Bhattacharya - Kesariya.mp3`
+- `[{year}] {artists} - {title}` *(with `--artists-separator " & "`)* &rarr; `[2022] Pritam & Arijit Singh & Amitabh Bhattacharya - Kesariya.mp3`
 - `{album}/{list_position} - {title}.{output_ext}` &rarr; `Brahmastra/01 - Kesariya.mp3`
 
 ---
@@ -278,6 +280,7 @@ Example `config.json`:
     "quality": "320",
     "source": "auto",
     "template": "{track} - {title}",
+    "artists_separator": ", ",
     "lyrics": true,
     "cover": true,
     "cookies": null,

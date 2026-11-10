@@ -20,6 +20,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "quality": "320",
     "source": "auto",
     "template": "{artist} - {title}",
+    "artists_separator": ", ",
     "lyrics": True,
     "cover": True,
     "cookies": None,
@@ -68,6 +69,8 @@ def load_config(file_path: str) -> Dict[str, Any]:
                     merged["id3_version"] = int(v)
                 except (ValueError, TypeError):
                     pass
+            elif k in ("artist_separator", "separator"):
+                merged["artists_separator"] = str(v)
 
     return merged
 
@@ -99,6 +102,7 @@ def save_config(config_dict: Dict[str, Any], file_path: str = "config.json") -> 
         "quality": str(config_dict.get("quality") or "320").strip(),
         "source": str(config_dict.get("source") or "auto").strip().lower(),
         "template": str(config_dict.get("template") or "{artist} - {title}").strip(),
+        "artists_separator": str(config_dict.get("artists_separator") if config_dict.get("artists_separator") is not None else ", "),
         "lyrics": bool(config_dict.get("lyrics", True)),
         "cover": bool(config_dict.get("cover", True)),
         "cookies": config_dict.get("cookies") or None,

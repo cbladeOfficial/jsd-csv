@@ -107,6 +107,14 @@ Supported Filename Identifiers (supports {tag} or {tag-name}):
     )
 
     parser.add_argument(
+        "--artists-separator", "--artist-separator",
+        dest="artists_separator",
+        type=str,
+        default=", ",
+        help="Separator string used between multiple artists in {artists} filename tag (default: ', ').",
+    )
+
+    parser.add_argument(
         "-q", "--quality",
         dest="quality",
         type=str,
@@ -259,6 +267,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     effective_quality = args.quality
     effective_source = args.source
     effective_template = args.template
+    effective_artists_separator = args.artists_separator
     effective_lyrics = args.lyrics
     effective_cover = args.cover
     effective_cookies = args.cookies
@@ -279,6 +288,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             effective_source = loaded_cfg.get("source")
         if not any(a in argv for a in ("-t", "--template")) and loaded_cfg.get("template"):
             effective_template = loaded_cfg.get("template")
+        if not any(a.startswith(("--artists-separator", "--artist-separator")) for a in argv) and "artists_separator" in loaded_cfg:
+            effective_artists_separator = str(loaded_cfg["artists_separator"])
         if not any(a in argv for a in ("--lyrics", "--no-lyrics")) and "lyrics" in loaded_cfg:
             effective_lyrics = bool(loaded_cfg.get("lyrics"))
         if not any(a in argv for a in ("--cover", "--no-cover")) and "cover" in loaded_cfg:
@@ -304,6 +315,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             quality=config["quality"],
             source=config["source"],
             template=config["template"],
+            artists_separator=config.get("artists_separator", effective_artists_separator),
             fetch_lyrics=config["lyrics"],
             embed_cover=config["cover"],
             cookies_file=config["cookies"],
@@ -325,6 +337,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "quality": effective_quality,
                 "source": effective_source,
                 "template": effective_template,
+                "artists_separator": effective_artists_separator,
                 "lyrics": effective_lyrics,
                 "cover": effective_cover,
                 "cookies": effective_cookies,
@@ -339,6 +352,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             quality=effective_quality,
             source=effective_source,
             template=effective_template,
+            artists_separator=effective_artists_separator,
             fetch_lyrics=effective_lyrics,
             embed_cover=effective_cover,
             cookies_file=effective_cookies,

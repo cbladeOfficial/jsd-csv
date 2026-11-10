@@ -306,6 +306,12 @@ def prompt_interactive_options(
         "  [bold #00f0ff]>[/] [bold white]Filename Pattern[/bold white]",
         default=str(cfg_data.get("template") or "{artist} - {title}"),
     )
+    artists_sep = str(cfg_data.get("artists_separator") if cfg_data.get("artists_separator") is not None else ", ")
+    if any(tag in template.lower() for tag in ("{artists}", "{all_artists}", "{allartists}")):
+        artists_sep = Prompt.ask(
+            "  [bold #00f0ff]>[/] [bold white]Artists Tag Separator[/bold white] [dim](e.g. ', ' or ',' or ' & ')[/dim]",
+            default=artists_sep,
+        )
 
     # Step 8: Lyrics
     render_step_header(
@@ -357,6 +363,7 @@ def prompt_interactive_options(
             "quality": selected_quality,
             "source": selected_source,
             "template": template.strip(),
+            "artists_separator": artists_sep,
             "lyrics": fetch_lyrics,
             "cover": True,
             "cookies": cookies_path,
@@ -374,6 +381,7 @@ def prompt_interactive_options(
         "quality": selected_quality,
         "source": selected_source,
         "template": template.strip(),
+        "artists_separator": artists_sep,
         "lyrics": fetch_lyrics,
         "cookies": cookies_path,
         "cover": True,

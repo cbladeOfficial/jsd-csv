@@ -5,7 +5,7 @@ Supports customizable naming patterns like '{artist} - {title}', '{album}/{track
 
 import os
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 # Windows reserved names that cannot be used as filenames or directories
 WINDOWS_RESERVED = {
@@ -66,7 +66,7 @@ def sanitize_path(path_str: str) -> str:
     return os.path.join(*sanitized_parts) if sanitized_parts else "output"
 
 
-def format_filename(template: str, metadata: Dict[str, Any]) -> str:
+def format_filename(template: str, metadata: Dict[str, Any], artists_separator: Optional[str] = None) -> str:
     """
     Formats a filename using template placeholders and song metadata.
     Supports spotDL-style and JSD-CSV placeholders (case-insensitive, with hyphens or underscores).
@@ -74,7 +74,7 @@ def format_filename(template: str, metadata: Dict[str, Any]) -> str:
     Supported placeholders:
       {title}, {song}, {name}                - Track title
       {artist}, {primary_artist}             - Primary lead artist
-      {artists}, {all_artists}               - All track artists (comma-separated)
+      {artists}, {all_artists}               - All track artists (separated by artists_separator)
       {album_artist}, {albumartist}          - Album artist / primary music composer
       {album}, {album_name}                  - Album name
       {year}, {release_year}                 - Release year
@@ -100,12 +100,21 @@ def format_filename(template: str, metadata: Dict[str, Any]) -> str:
     Args:
         template: Custom naming string like '{artists} - {title}' or '{album}/{track} - {title}'
         metadata: Dictionary containing track information.
+        artists_separator: String used to join multiple artists in {artists} (default: ', ').
         
     Returns:
         A sanitized, formatted filename (without extension).
     """
     if not template or not template.strip():
         template = "{artist} - {title}"
+
+    # Determine artists separator: metadata override > explicit argument > default ', '
+    if metadata.get("artists_separator") is not None:
+        sep = str(metadata["artists_separator"])
+    elif artists_separator is not None:
+        sep = str(artists_separator)
+    else:
+        sep = ", "
 
     # Compute track numbers
     raw_track = metadata.get("track_number") or metadata.get("track") or metadata.get("list_position") or 1
@@ -143,11 +152,26 @@ def format_filename(template: str, metadata: Dict[str, Any]) -> str:
         or metadata.get("artist")
         or "Unknown Artist"
     )
-    all_artists = str(
-        metadata.get("artists")
-        or metadata.get("all_artists")
-        or primary_artist
-    )
+
+    # Extract distinct list of artists and join using configured separator
+    raw_artists_list = metadata.get("artists_list")
+    clean_artists: List[str] = []
+    if raw_artists_list and isinstance(raw_artists_list, (list, tuple)):
+        for item in raw_artists_list:
+            s = str(item).strip()
+            if s and s not in clean_artists:
+                clean_artists.append(s)
+    elif metadata.get("artists") or metadata.get("all_artists"):
+        raw_str = str(metadata.get("artists") or metadata.get("all_artists") or "")
+        for item in raw_str.split(","):
+            s = item.strip()
+            if s and s not in clean_artists:
+                clean_artists.append(s)
+
+    if clean_artists:
+        all_artists = sep.join(clean_artists)
+    else:
+        all_artists = primary_artist
     album_artist = str(
         metadata.get("album_artist")
         or metadata.get("music")

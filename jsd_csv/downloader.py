@@ -189,6 +189,7 @@ class DownloaderEngine:
         quality: str = "320",  # '320', '160', '96'
         source: str = "auto",  # 'auto', 'saavn', 'ytmusic'
         template: str = "{artist} - {title}",
+        artists_separator: str = ", ",
         fetch_lyrics: bool = True,
         embed_cover: bool = True,
         cookies_file: Optional[str] = None,
@@ -200,6 +201,7 @@ class DownloaderEngine:
         self.quality = quality
         self.source = source.lower()
         self.template = template
+        self.artists_separator = artists_separator
         self.fetch_lyrics = fetch_lyrics
         self.embed_cover = embed_cover
         self.cookies_file = cookies_file
@@ -477,7 +479,8 @@ class DownloaderEngine:
     ) -> bool:
         """Downloads audio via JioSaavn direct or YT Music fallback, transcodes to MP3, and embeds tags."""
         track_title = song.get("title", "Unknown")
-        rel_filename = format_filename(self.template, song)
+        song["artists_separator"] = self.artists_separator
+        rel_filename = format_filename(self.template, song, artists_separator=self.artists_separator)
         if rel_filename.lower().endswith(".mp3"):
             dest_mp3 = os.path.join(self.output_dir, rel_filename)
         else:
