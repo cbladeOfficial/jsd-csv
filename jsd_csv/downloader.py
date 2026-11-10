@@ -2,6 +2,7 @@
 Core Download and Processing Engine for JSD-CSV.
 Orchestrates metadata fetching, JioSaavn CDN streaming, FFmpeg transcoding,
 YouTube Music fallback matching, MP3 ID3 tagging, and CSV exporting/importing.
+Features dual real-time progress bars with speed, transferred MB, ETA, and stages (no emojis).
 """
 
 import logging
@@ -14,15 +15,17 @@ import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
+from rich.filesize import decimal
 from rich.progress import (
     BarColumn,
-    MofNCompleteColumn,
     Progress,
+    ProgressColumn,
     SpinnerColumn,
+    TaskID,
     TaskProgressColumn,
     TextColumn,
-    TimeRemainingColumn,
 )
+from rich.text import Text
 
 from .api import JioSaavnAPI
 from .csv_exporter import CSVExporter, load_csv
@@ -73,6 +76,65 @@ def check_ffmpeg() -> bool:
     return get_ffmpeg_path() is not None
 
 
+def format_short_size(bytes_val: int) -> str:
+    """Formats bytes into compact strings (e.g. 512K, 8.4M)."""
+    if bytes_val < 1024 * 1024:
+        return f"{bytes_val / 1024:.0f}K"
+    return f"{bytes_val / (1024 * 1024):.1f}M"
+
+
+class SmartMetricsColumn(ProgressColumn):
+    """Renders '[1/5]' for overall tracks, or '4.2M/8.5M' for byte streaming."""
+
+    def render(self, task) -> Text:
+        unit = task.fields.get("unit", "bytes")
+        if unit == "tracks":
+            c = int(task.completed)
+            t = int(task.total) if task.total is not None else 0
+            return Text(f"[{c}/{t}]".center(11), style="bold #94a3b8")
+        elif unit == "bytes":
+            c = format_short_size(int(task.completed))
+            t = format_short_size(int(task.total)) if task.total else "?"
+            return Text(f"{c}/{t}".center(11), style="bold #94a3b8")
+        elif unit == "step":
+            st = task.fields.get("step_text", "")
+            return Text(f"{st}".center(11), style="bold #a855f7")
+        return Text(" " * 11)
+
+
+class SmartSpeedColumn(ProgressColumn):
+    """Renders real-time download transfer speed (e.g. '3.2 MB/s')."""
+
+    def render(self, task) -> Text:
+        unit = task.fields.get("unit", "bytes")
+        if unit == "bytes":
+            speed = task.finished_speed or task.speed
+            if speed is None:
+                return Text("  -- MB/s", style="dim #64748b")
+            s = f"{decimal(int(speed))}/s"
+            return Text(f"{s:>9}", style="bold #38bdf8")
+        return Text(" " * 9)
+
+
+class SmartTimeColumn(ProgressColumn):
+    """Renders ETA time remaining or [DONE] upon task completion."""
+
+    def render(self, task) -> Text:
+        if task.finished:
+            return Text(" [DONE] ", style="bold #22c55e")
+        eta = task.time_remaining
+        if eta is not None:
+            m, s = divmod(int(eta), 60)
+            return Text(f" {m:02d}:{s:02d} ", style="dim #facc15")
+        return Text(" " * 8)
+
+
+def format_stage_desc(badge: str, title: str, max_title_len: int = 17) -> str:
+    """Formats an aligned description with a 10-char badge and truncated title (total 28 chars)."""
+    clean_title = (title[: max_title_len - 3] + "...") if len(title) > max_title_len else title.ljust(max_title_len)
+    return f"{badge} {clean_title}"
+
+
 class DownloaderEngine:
     """Orchestrates track downloading, transcoding, tagging, and CSV generation/importing."""
 
@@ -112,12 +174,12 @@ class DownloaderEngine:
     ) -> Tuple[int, int, Optional[str]]:
         """
         Executes the main pipeline.
-        
+
         Args:
             input_target: JioSaavn URL, search query, or CSV path.
             csv_source: Optional path or URL to an existing CSV file.
             auto_confirm: If True, skips interactive confirmation prompt.
-            
+
         Returns:
             Tuple of (total_processed, successful_downloads, csv_file_path).
         """
@@ -194,22 +256,44 @@ class DownloaderEngine:
         failed_count = 0
         processed_records: List[Dict[str, Any]] = []
 
-        # Rich Progress Bar setup with vivid color styling
+        # Rich Progress Bar setup with dual collection & real-time byte tracking
         with Progress(
-            SpinnerColumn(spinner_name="dots12", style="bold #d946ef"),
-            TextColumn("[bold bright_white]{task.description}[/bold bright_white]"),
-            BarColumn(complete_style="bold #c084fc", finished_style="bold #4ade80", pulse_style="bold #38bdf8"),
+            SpinnerColumn(spinner_name="dots12", style="bold #00f0ff"),
+            TextColumn("{task.description}"),
+            BarColumn(
+                bar_width=18,
+                complete_style="bold #00f0ff",
+                finished_style="bold #22c55e",
+                pulse_style="bold #c084fc",
+            ),
             TaskProgressColumn(text_format="[bold #facc15]{task.percentage:>3.0f}%[/bold #facc15]"),
-            MofNCompleteColumn(),
-            TimeRemainingColumn(compact=True),
+            SmartMetricsColumn(),
+            SmartSpeedColumn(),
+            SmartTimeColumn(),
             console=console,
         ) as progress:
-            main_task = progress.add_task("[bold #38bdf8]▶ Processing tracks...[/bold #38bdf8]", total=total_tracks)
+            overall_task = progress.add_task(
+                "[bold bright_white]Overall Progress            [/bold bright_white]",
+                total=total_tracks,
+                unit="tracks",
+            )
+            track_task = progress.add_task(
+                "[bold dim]Waiting for track...        [/bold dim]",
+                total=100,
+                unit="step",
+                step_text="Waiting",
+            )
 
             for idx, song in enumerate(songs):
                 track_title = song.get("title", "Unknown")
-                track_num = idx + 1
-                progress.update(main_task, description=f"[bold #38bdf8]▶ [{track_num}/{total_tracks}][/bold #38bdf8] [bold bright_white]{track_title[:32]}[/bold bright_white]")
+                progress.update(
+                    track_task,
+                    description=format_stage_desc("[bold #00f0ff][START   ][/bold #00f0ff]", track_title),
+                    completed=0,
+                    total=100,
+                    unit="step",
+                    step_text="Resolving",
+                )
 
                 # If loaded from CSV, resolve any missing JioSaavn streams or details
                 if song.get("from_csv"):
@@ -238,10 +322,22 @@ class DownloaderEngine:
                 song["bitrate"] = f"{self.quality} kbps"
                 if self.mode == "csv":
                     song["download_status"] = "CSV Only"
+                    progress.update(
+                        track_task,
+                        description=format_stage_desc("[bold #059669][RECORDED][/bold #059669]", track_title),
+                        unit="step",
+                        step_text="CSV Record",
+                        completed=100,
+                        total=100,
+                    )
                     success_count += 1
                 else:
                     # Download audio & embed metadata tags + cover
-                    ok = self._download_and_tag_track(song)
+                    ok = self._download_and_tag_track(
+                        song=song,
+                        progress=progress,
+                        track_task=track_task,
+                    )
                     if ok:
                         song["download_status"] = "Downloaded"
                         success_count += 1
@@ -250,7 +346,7 @@ class DownloaderEngine:
                         failed_count += 1
 
                 processed_records.append(song)
-                progress.advance(main_task)
+                progress.advance(overall_task)
 
         # Write or update CSV file
         csv_path = None
@@ -313,8 +409,14 @@ class DownloaderEngine:
             except Exception as e:
                 logger.debug(f"Failed to lookup song by URL {perma_url}: {e}")
 
-    def _download_and_tag_track(self, song: Dict[str, Any]) -> bool:
+    def _download_and_tag_track(
+        self,
+        song: Dict[str, Any],
+        progress: Optional[Progress] = None,
+        track_task: Optional[TaskID] = None,
+    ) -> bool:
         """Downloads audio via JioSaavn direct or YT Music fallback, transcodes to MP3, and embeds tags."""
+        track_title = song.get("title", "Unknown")
         rel_filename = format_filename(self.template, song)
         dest_mp3 = os.path.join(self.output_dir, f"{rel_filename}.mp3")
         os.makedirs(os.path.dirname(dest_mp3), exist_ok=True)
@@ -325,7 +427,15 @@ class DownloaderEngine:
         # Skip download if already exists and non-empty
         if os.path.exists(dest_mp3) and os.path.getsize(dest_mp3) > 1024:
             song["audio_source"] = "Existing File"
-            # Ensure tags and cover are up to date
+            if progress and track_task is not None:
+                progress.update(
+                    track_task,
+                    description=format_stage_desc("[bold #059669][CACHED  ][/bold #059669]", track_title),
+                    unit="step",
+                    step_text="ID3 Synced",
+                    completed=100,
+                    total=100,
+                )
             embed_metadata(
                 mp3_file_path=dest_mp3,
                 song_metadata=song,
@@ -339,7 +449,12 @@ class DownloaderEngine:
 
         # Strategy 1: Attempt direct download from JioSaavn CDN
         if self.source in ("auto", "saavn"):
-            direct_ok = self._try_saavn_direct_download(song, dest_mp3)
+            direct_ok = self._try_saavn_direct_download(
+                song=song,
+                dest_mp3=dest_mp3,
+                progress=progress,
+                track_task=track_task,
+            )
             if direct_ok:
                 downloaded_source = "JioSaavn CDN"
 
@@ -354,16 +469,41 @@ class DownloaderEngine:
                     song["yt_url"] = yt_match.get("url")
                     song["yt_title"] = yt_match.get("title")
             if yt_id:
-                yt_ok = self._try_ytmusic_download(yt_id, dest_mp3)
+                yt_ok = self._try_ytmusic_download(
+                    video_id=yt_id,
+                    dest_mp3=dest_mp3,
+                    progress=progress,
+                    track_task=track_task,
+                    track_title=track_title,
+                )
                 if yt_ok:
                     downloaded_source = "YouTube Music"
 
         if not downloaded_source or not os.path.exists(dest_mp3):
+            if progress and track_task is not None:
+                progress.update(
+                    track_task,
+                    description=format_stage_desc("[bold #ef4444][FAILED  ][/bold #ef4444]", track_title),
+                    unit="step",
+                    step_text="Failed",
+                    completed=0,
+                    total=100,
+                )
             return False
 
         song["audio_source"] = downloaded_source
 
         # Embed complete ID3 metadata, lyrics, and album cover
+        if progress and track_task is not None:
+            progress.update(
+                track_task,
+                description=format_stage_desc("[bold #f59e0b][TAGGING ][/bold #f59e0b]", track_title),
+                unit="step",
+                step_text="ID3+Art",
+                completed=90,
+                total=100,
+            )
+
         embed_metadata(
             mp3_file_path=dest_mp3,
             song_metadata=song,
@@ -372,10 +512,27 @@ class DownloaderEngine:
             session=self.session,
         )
 
+        if progress and track_task is not None:
+            progress.update(
+                track_task,
+                description=format_stage_desc("[bold #22c55e][COMPLETE][/bold #22c55e]", track_title),
+                unit="step",
+                step_text="Complete",
+                completed=100,
+                total=100,
+            )
+
         return True
 
-    def _try_saavn_direct_download(self, song: Dict[str, Any], dest_mp3: str) -> bool:
+    def _try_saavn_direct_download(
+        self,
+        song: Dict[str, Any],
+        dest_mp3: str,
+        progress: Optional[Progress] = None,
+        track_task: Optional[TaskID] = None,
+    ) -> bool:
         """Downloads direct audio stream from JioSaavn CDN and converts to MP3."""
+        track_title = song.get("title", "Unknown")
         media_urls = song.get("media_urls", {})
         if not media_urls:
             return False
@@ -406,13 +563,34 @@ class DownloaderEngine:
         try:
             with self.session.get(cdn_url, stream=True, timeout=25) as r:
                 r.raise_for_status()
+                total_bytes = int(r.headers.get("content-length", 0))
+                if progress and track_task is not None:
+                    progress.reset(
+                        track_task,
+                        total=total_bytes if total_bytes > 0 else None,
+                        description=format_stage_desc("[bold #00f0ff][DOWNLOAD][/bold #00f0ff]", track_title),
+                    )
+                    progress.update(track_task, unit="bytes", step_text="")
+
                 with open(temp_in, "wb") as f:
                     for chunk in r.iter_content(chunk_size=65536):
                         if chunk:
                             f.write(chunk)
+                            if progress and track_task is not None:
+                                progress.advance(track_task, len(chunk))
 
             if not os.path.exists(temp_in) or os.path.getsize(temp_in) < 1000:
                 return False
+
+            if progress and track_task is not None:
+                progress.update(
+                    track_task,
+                    description=format_stage_desc("[bold #c084fc][CONVERT ][/bold #c084fc]", track_title),
+                    unit="step",
+                    step_text=f"{self.quality}k MP3",
+                    completed=100,
+                    total=100,
+                )
 
             ffmpeg_bin = get_ffmpeg_path() or "ffmpeg"
             cmd = [
@@ -437,15 +615,55 @@ class DownloaderEngine:
                 except Exception:
                     pass
 
-    def _try_ytmusic_download(self, video_id: str, dest_mp3: str) -> bool:
+    def _try_ytmusic_download(
+        self,
+        video_id: str,
+        dest_mp3: str,
+        progress: Optional[Progress] = None,
+        track_task: Optional[TaskID] = None,
+        track_title: str = "Track",
+    ) -> bool:
         """Downloads audio track via YouTube Music using yt-dlp."""
         temp_base = os.path.splitext(dest_mp3)[0] + "_yttmp"
+
+        if progress and track_task is not None:
+            progress.reset(
+                track_task,
+                total=None,
+                description=format_stage_desc("[bold #7c3aed][YTM-DL  ][/bold #7c3aed]", track_title),
+            )
+            progress.update(track_task, unit="bytes", step_text="")
+
+        def yt_hook(d: Dict[str, Any]) -> None:
+            if not progress or track_task is None:
+                return
+            status = d.get("status")
+            if status == "downloading":
+                dl_bytes = d.get("downloaded_bytes", 0)
+                tot = d.get("total_bytes") or d.get("total_bytes_estimate")
+                progress.update(
+                    track_task,
+                    completed=dl_bytes,
+                    total=tot,
+                    unit="bytes",
+                )
+            elif status == "finished":
+                progress.update(
+                    track_task,
+                    description=format_stage_desc("[bold #c084fc][CONVERT ][/bold #c084fc]", track_title),
+                    unit="step",
+                    step_text=f"{self.quality}k MP3",
+                    completed=100,
+                    total=100,
+                )
+
         try:
             bitrate_int = int(self.quality) if self.quality.isdigit() else 320
             ok = self.yt_matcher.download_audio(
                 video_id=video_id,
                 output_path_without_ext=temp_base,
                 bitrate_kbps=bitrate_int,
+                progress_hook=yt_hook,
             )
             created_mp3 = f"{temp_base}.mp3"
             if ok and os.path.exists(created_mp3):
@@ -453,7 +671,7 @@ class DownloaderEngine:
                 return True
             return False
         except Exception as e:
-            logger.debug(f"YouTube download failed for {video_id}: {e}")
+            logger.error(f"YouTube download failed for {video_id}: {e}")
             return False
         finally:
             for extra in [f"{temp_base}.mp3", f"{temp_base}.webm", f"{temp_base}.m4a"]:

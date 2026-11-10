@@ -1,7 +1,7 @@
 """
 Sleek, High-Color Rich Terminal User Interface for JSD-CSV.
 Provides stylized gradient banners, colorful badge prompts, track overview tables,
-and vivid completion summaries.
+and vivid completion summaries with clean ASCII styling and zero emojis.
 """
 
 import os
@@ -32,41 +32,37 @@ console = Console(legacy_windows=False)
 
 
 def render_gradient_banner() -> Panel:
-    """Builds a vibrant two-tone gradient ASCII banner with badge highlights."""
-    banner = Text()
-    # Line 1
-    banner.append("     ██╗███████╗██████╗ ", style="bold #00f0ff")
-    banner.append("        ██████╗███████╗██╗   ██╗\n", style="bold #d946ef")
-    # Line 2
-    banner.append("     ██║██╔════╝██╔══██╗", style="bold #00e1ff")
-    banner.append("       ██╔════╝██╔════╝██║   ██║\n", style="bold #c026d3")
-    # Line 3
-    banner.append("     ██║███████╗██║  ██║", style="bold #00b4d8")
-    banner.append(" █████╗██║     ███████╗██║   ██║\n", style="bold #a21caf")
-    # Line 4
-    banner.append("██   ██║╚════██║██║  ██║", style="bold #0096c7")
-    banner.append(" ╚════╝██║     ╚════██║╚██╗ ██╔╝\n", style="bold #86198f")
-    # Line 5
-    banner.append("╚█████╔╝███████║██████╔╝", style="bold #0077b6")
-    banner.append("       ╚██████╗███████║ ╚████╔╝ \n", style="bold #701a75")
-    # Line 6
-    banner.append(" ╚════╝ ╚══════╝╚═════╝ ", style="bold #023e8a")
-    banner.append("        ╚═════╝╚══════╝  ╚═══╝  \n", style="bold #4a044e")
+    """Builds a crisp, perfectly aligned two-tone gradient ASCII banner with badge highlights."""
+    banner_lines = [
+        r"    ██╗███████╗██████╗        ██████╗███████╗██╗   ██╗",
+        r"    ██║██╔════╝██╔══██╗      ██╔════╝██╔════╝██║   ██║",
+        r"    ██║███████╗██║  ██║█████╗██║     ███████╗██║   ██║",
+        r"    ██║╚════██║██║  ██║╚════╝██║     ╚════██║╚██╗ ██╔╝",
+        r"██████║███████║██████╔╝      ╚██████╗███████║ ╚████╔╝ ",
+        r"╚═════╝╚══════╝╚═════╝        ╚═════╝╚══════╝  ╚═══╝  ",
+    ]
 
-    # Badges bar
+    banner = Text()
+    for line in banner_lines:
+        banner.append(line[:23], style="bold #00f0ff")
+        banner.append(line[23:30], style="bold bright_white")
+        banner.append(line[30:], style="bold #d946ef")
+        banner.append("\n")
+
+    # Badges bar (no emojis)
     badges = Text()
     badges.append(" JioSaavn Downloader with CSV ", style="bold bright_white")
-    badges.append(" • ", style="bold bright_yellow")
+    badges.append(" | ", style="bold #facc15")
     badges.append("v1.0.0\n", style="bold bright_cyan")
-    badges.append(" [🎵 320 KBPS] ", style="bold white on #0284c7")
+    badges.append(" [320 KBPS] ", style="bold white on #0284c7")
     badges.append(" ", style="default")
-    badges.append(" [⚡ YT MUSIC FALLBACK] ", style="bold white on #7c3aed")
+    badges.append(" [YT MUSIC FALLBACK] ", style="bold white on #7c3aed")
     badges.append(" ", style="default")
-    badges.append(" [📊 CSV BATCH] ", style="bold white on #059669")
+    badges.append(" [CSV BATCH] ", style="bold white on #059669")
     badges.append(" ", style="default")
-    badges.append(" [🎨 ID3 + ART] ", style="bold white on #d97706")
+    badges.append(" [ID3 + ART] ", style="bold white on #d97706")
     badges.append(" ", style="default")
-    badges.append(" [📝 FULL LYRICS] ", style="bold white on #e11d48")
+    badges.append(" [FULL LYRICS] ", style="bold white on #e11d48")
 
     content = Text()
     content.append_text(banner)
@@ -92,7 +88,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
     Runs the sleek interactive setup wizard with vibrant badge numbers and styled options.
     Returns a dictionary of parsed options.
     """
-    console.print("[bold #38bdf8]───[/] [bold #a855f7]⚡[/] [bold bright_white]INTERACTIVE CONFIGURATION WIZARD[/] [bold #38bdf8]───[/]")
+    console.print("[bold #38bdf8]=== [/][bold #a855f7]::[/] [bold bright_white]INTERACTIVE CONFIGURATION WIZARD[/] [bold #a855f7]::[/][bold #38bdf8] ===[/]")
     console.print("[dim]Configure your download parameters below or press Enter to accept defaults.[/dim]\n")
 
     # Step 1: Optional CSV
@@ -208,7 +204,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
 
 
 def display_collection_header(meta: Dict[str, Any]) -> None:
-    """Displays collection header details before track listing with rich badges."""
+    """Displays collection header details before track listing with rich badges (no emojis)."""
     raw_type = meta.get("type", "Collection").lower()
     title = meta.get("title", "Unknown")
     artist = meta.get("artist", "")
@@ -217,41 +213,41 @@ def display_collection_header(meta: Dict[str, Any]) -> None:
 
     header_text = Text()
 
-    # Badge for type
+    # Badges for types
     type_badge_map = {
-        "csv": (" 📋 CSV BATCH ", "bold white on #059669"),
-        "album": (" 💿 ALBUM ", "bold white on #2563eb"),
-        "playlist": (" 📑 PLAYLIST ", "bold white on #7c3aed"),
-        "artist": (" 🎤 ARTIST TOP ", "bold white on #d97706"),
-        "song": (" 🎵 SINGLE ", "bold white on #db2777"),
-        "search": (" 🔍 SEARCH RESULTS ", "bold white on #0891b2"),
+        "csv": (" [CSV BATCH] ", "bold white on #059669"),
+        "album": (" [ALBUM] ", "bold white on #2563eb"),
+        "playlist": (" [PLAYLIST] ", "bold white on #7c3aed"),
+        "artist": (" [ARTIST TOP] ", "bold white on #d97706"),
+        "song": (" [SINGLE] ", "bold white on #db2777"),
+        "search": (" [SEARCH RESULTS] ", "bold white on #0891b2"),
     }
-    badge_label, badge_style = type_badge_map.get(raw_type, (" 📦 COLLECTION ", "bold white on #4b5563"))
+    badge_label, badge_style = type_badge_map.get(raw_type, (" [COLLECTION] ", "bold white on #4b5563"))
     header_text.append(badge_label, style=badge_style)
     header_text.append(" ")
     header_text.append(title, style="bold bright_white")
 
     if artist and raw_type != "csv":
-        header_text.append("   •  ", style="dim yellow")
+        header_text.append("   |  ", style="dim yellow")
         header_text.append("Artist: ", style="bold cyan")
         header_text.append(artist, style="bright_white")
 
     if source and raw_type == "csv":
-        header_text.append("   •  ", style="dim yellow")
+        header_text.append("   |  ", style="dim yellow")
         header_text.append("Source: ", style="bold cyan")
         short_src = source if len(source) <= 50 else source[:47] + "..."
         header_text.append(short_src, style="dim white")
 
-    header_text.append("   •  ", style="dim yellow")
+    header_text.append("   |  ", style="dim yellow")
     header_text.append(f" {count} TRACKS ", style="bold black on #4ade80")
 
     console.print(Panel(header_text, box=box.ROUNDED, border_style="bright_blue", padding=(0, 1)))
 
 
 def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> None:
-    """Displays a neat, colorful table of tracks about to be processed."""
+    """Displays a neat, colorful table of tracks about to be processed (no emojis)."""
     table = Table(
-        title="[bold #38bdf8]─── Found Tracks Preview ───[/bold #38bdf8]",
+        title="[bold #38bdf8]=== Found Tracks Preview ===[/bold #38bdf8]",
         title_justify="left",
         box=box.ROUNDED,
         border_style="bright_blue",
@@ -267,14 +263,14 @@ def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> Non
 
     display_list = songs[:max_rows]
     for idx, s in enumerate(display_list):
-        lyrics_icon = "[bold #22c55e]✓ LYRICS[/]" if s.get("has_lyrics") or s.get("lyrics") else "[dim]—[/]"
+        lyrics_icon = "[bold #22c55e][LYRICS][/]" if s.get("has_lyrics") or s.get("lyrics") else "[dim]--[/]"
         dur_fmt = s.get("duration_formatted", "00:00")
         table.add_row(
             f"{s.get('track_number') or idx + 1:02d}",
             s.get("title", "Unknown")[:35],
             (s.get("primary_artists") or s.get("artist") or "Unknown")[:28],
             s.get("album", "Unknown")[:25],
-            f"⏱ {dur_fmt}",
+            dur_fmt,
             lyrics_icon,
         )
 
@@ -293,38 +289,38 @@ def display_summary_report(
     output_dir: str,
     elapsed_seconds: float,
 ) -> None:
-    """Renders a sleek, colorful dashboard summary card upon completion."""
+    """Renders a sleek, colorful dashboard summary card upon completion (no emojis)."""
     summary_table = Table.grid(padding=(0, 2))
     summary_table.add_column(style="bold cyan", justify="right")
     summary_table.add_column(style="bright_white")
 
     summary_table.add_row(
-        "[bold white on #16a34a] ✔ COMPLETED [/]",
+        "[bold white on #16a34a] COMPLETED [/]",
         f"[bold bright_green]{success_count}[/] / [bold bright_white]{total}[/] tracks successfully processed",
     )
     if failed_count > 0:
         summary_table.add_row(
-            "[bold white on #dc2626] ✖ FAILED [/]",
+            "[bold white on #dc2626] FAILED [/]",
             f"[bold red]{failed_count}[/] tracks encountered errors or skipped",
         )
     summary_table.add_row(
-        "[bold white on #0284c7] 📁 OUTPUT [/]",
+        "[bold white on #0284c7] OUTPUT [/]",
         f"[bold bright_cyan]{os.path.abspath(output_dir)}[/bold bright_cyan]",
     )
     if csv_path and os.path.exists(csv_path):
         summary_table.add_row(
-            "[bold white on #7c3aed] 📊 CSV RECORD [/]",
+            "[bold white on #7c3aed] CSV RECORD [/]",
             f"[bold bright_magenta]{os.path.abspath(csv_path)}[/bold bright_magenta]",
         )
     mins, secs = divmod(int(elapsed_seconds), 60)
     summary_table.add_row(
-        "[bold white on #d97706] ⏱ TIME [/]",
+        "[bold white on #d97706] TIME [/]",
         f"[bold #facc15]{mins}m {secs:02d}s[/bold #facc15]",
     )
 
     panel = Panel(
         summary_table,
-        title="✨ [bold bright_white]JSD-CSV Pipeline Complete[/bold bright_white] ✨",
+        title="[bold bright_white]JSD-CSV Pipeline Complete[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_green",
         padding=(1, 2),
