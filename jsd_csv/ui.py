@@ -1,24 +1,12 @@
 """
 Sleek, High-Color Rich Terminal User Interface for JSD-CSV.
-Provides stylized gradient banners, colorful badge prompts, track overview tables,
-and vivid completion summaries with clean ASCII styling and zero emojis.
+Provides stylized gradient banners, solid box badges, elegant interactive wizard,
+found tracks table, and completion dashboard with zero emojis.
 """
 
 import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple
-
-# Reconfigure stdout/stderr for cross-platform UTF-8 support
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
-if hasattr(sys.stderr, "reconfigure"):
-    try:
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:
-        pass
+from typing import Any, Dict, List, Optional
 
 from rich import box
 from rich.align import Align
@@ -28,11 +16,25 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.text import Text
 
+# Force UTF-8 stdout encoding on Windows to prevent legacy charmap crashes
+if sys.platform.startswith("win"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 console = Console(legacy_windows=False)
 
 
+def make_box_badge(text: str, bg_color: str, fg_color: str = "white", width: Optional[int] = None) -> Text:
+    """Builds a complete solid colored box with centered text (no brackets)."""
+    label = text.center(width) if width else f"  {text}  "
+    return Text(label, style=f"bold {fg_color} on {bg_color}")
+
+
 def render_gradient_banner() -> Panel:
-    """Builds a crisp, perfectly aligned two-tone gradient ASCII banner with badge highlights."""
+    """Builds a crisp, perfectly aligned two-tone gradient ASCII banner with solid box badges."""
     banner_lines = [
         r"    ██╗███████╗██████╗        ██████╗███████╗██╗   ██╗",
         r"    ██║██╔════╝██╔══██╗      ██╔════╝██╔════╝██║   ██║",
@@ -49,86 +51,133 @@ def render_gradient_banner() -> Panel:
         banner.append(line[30:], style="bold #d946ef")
         banner.append("\n")
 
-    # Badges bar (no emojis)
-    badges = Text()
-    badges.append(" JioSaavn Downloader with CSV ", style="bold bright_white")
-    badges.append(" | ", style="bold #facc15")
-    badges.append("v1.0.0\n", style="bold bright_cyan")
-    badges.append(" [320 KBPS] ", style="bold white on #0284c7")
-    badges.append(" ", style="default")
-    badges.append(" [YT MUSIC FALLBACK] ", style="bold white on #7c3aed")
-    badges.append(" ", style="default")
-    badges.append(" [CSV BATCH] ", style="bold white on #059669")
-    badges.append(" ", style="default")
-    badges.append(" [ID3 + ART] ", style="bold white on #d97706")
-    badges.append(" ", style="default")
-    badges.append(" [FULL LYRICS] ", style="bold white on #e11d48")
+    banner.append("\n")
+    banner.append(" JioSaavn Downloader with CSV ", style="bold bright_white")
+    banner.append(" | ", style="bold #facc15")
+    banner.append("v1.0.0\n\n", style="bold bright_cyan")
 
-    content = Text()
-    content.append_text(banner)
-    content.append("\n")
-    content.append_text(badges)
+    # Complete solid boxes (no brackets, decent spacing)
+    banner.append("  320 KBPS  ", style="bold white on #0284c7")
+    banner.append("   ", style="default")
+    banner.append("  YT MUSIC FALLBACK  ", style="bold white on #7c3aed")
+    banner.append("   ", style="default")
+    banner.append("  CSV BATCH  ", style="bold white on #059669")
+    banner.append("   ", style="default")
+    banner.append("  ID3 + ART  ", style="bold white on #d97706")
+    banner.append("   ", style="default")
+    banner.append("  FULL LYRICS  ", style="bold white on #e11d48")
 
     return Panel(
-        Align.center(content),
+        Align.center(banner),
         box=box.ROUNDED,
-        border_style="bright_cyan",
-        padding=(0, 2),
+        border_style="bright_blue",
+        padding=(1, 3),
     )
 
 
 def print_banner() -> None:
-    """Renders the sleek JSD-CSV banner in full color."""
+    """Renders the sleek JSD-CSV banner in full color with decent spacing."""
+    console.print()
     console.print(render_gradient_banner())
+    console.print()
+
+
+def render_step_header(
+    step_num: str,
+    title: str,
+    subtitle: str = "",
+    badge: Optional[str] = None,
+    badge_color: str = "#10b981",
+) -> None:
+    """Renders an elegant, spacious step card header with solid box step badge."""
+    console.print()
+    step_box = Text(f" STEP {step_num} ".center(10), style="bold white on #6366f1")
+    header = Text()
+    header.append_text(step_box)
+    header.append("  ")
+    header.append(title, style="bold bright_white")
+    if badge:
+        header.append("  ")
+        header.append(f"  {badge}  ", style=f"bold white on {badge_color}")
+    console.print(header)
+    if subtitle:
+        console.print(f"            [dim #94a3b8]{subtitle}[/dim #94a3b8]")
     console.print()
 
 
 def prompt_interactive_options() -> Dict[str, Any]:
     """
-    Runs the sleek interactive setup wizard with vibrant badge numbers and styled options.
+    Runs the sleek interactive setup wizard with solid box badges, generous padding, and elegant spacing.
     Returns a dictionary of parsed options.
     """
-    console.print("[bold #38bdf8]=== [/][bold #a855f7]::[/] [bold bright_white]INTERACTIVE CONFIGURATION WIZARD[/] [bold #a855f7]::[/][bold #38bdf8] ===[/]")
-    console.print("[dim]Configure your download parameters below or press Enter to accept defaults.[/dim]\n")
+    wizard_panel = Panel(
+        Text.from_markup(
+            "[bold bright_white]INTERACTIVE CONFIGURATION WIZARD[/bold bright_white]\n"
+            "[dim #94a3b8]Configure your download parameters below or press Enter to accept recommended defaults.[/dim #94a3b8]"
+        ),
+        box=box.ROUNDED,
+        border_style="bold #38bdf8",
+        padding=(1, 3),
+    )
+    console.print(wizard_panel)
 
     # Step 1: Optional CSV
-    console.print("[bold white on #7c3aed] 1 [/] [bold bright_white]Load tracks from an existing CSV file or online URL[/] [dim](optional)[/]")
+    render_step_header(
+        step_num="1",
+        title="CSV Batch Import",
+        subtitle="Load tracks directly from an existing CSV file or online URL",
+        badge="OPTIONAL",
+        badge_color="#475569",
+    )
     csv_input = Prompt.ask(
-        "    [bold #38bdf8]?[/] [bold]CSV Path or Online URL [dim](press Enter to skip)[/dim][/bold]",
+        "  [bold #00f0ff]>[/] [bold white]CSV File Path or Online URL[/bold white] [dim](press Enter to skip)[/dim]",
         default="",
     ).strip().strip("'\"")
 
     url_input = ""
     if not csv_input:
         # Step 2: JioSaavn Link or Query
-        console.print("\n[bold white on #0284c7] 2 [/] [bold bright_white]Enter JioSaavn Link or Search Query[/]")
+        render_step_header(
+            step_num="2",
+            title="JioSaavn Link or Search Query",
+            subtitle="Song, Album, Playlist, Artist link or free-text search keywords",
+        )
         while True:
             url_input = Prompt.ask(
-                "    [bold #38bdf8]?[/] [bold]JioSaavn URL or Search Query[/bold]"
+                "  [bold #00f0ff]>[/] [bold white]JioSaavn URL or Search Keywords[/bold white]"
             )
             if url_input.strip():
                 break
-            console.print("    [red]Input cannot be empty. Please enter a valid link, query, or CSV path.[/red]")
-            
+            console.print("    [bold red]Input cannot be empty. Please enter a valid link, query, or CSV path.[/bold red]\n")
+
         clean_url = url_input.strip().strip("'\"")
         if clean_url.lower().endswith(".csv") or ".csv?" in clean_url.lower() or (os.path.exists(clean_url) and os.path.isfile(clean_url)):
             csv_input = clean_url
             url_input = ""
 
     # Step 3: Output Directory
-    console.print("\n[bold white on #059669] 3 [/] [bold bright_white]Target Output Directory[/]")
+    render_step_header(
+        step_num="3",
+        title="Output Directory",
+        subtitle="Target folder where downloaded MP3s and metadata CSV will be stored",
+    )
     out_dir = Prompt.ask(
-        "    [bold #38bdf8]?[/] [bold]Destination Folder[/bold]",
+        "  [bold #00f0ff]>[/] [bold white]Destination Folder[/bold white]",
         default="./downloads",
     )
 
     # Step 4: Mode Selection
-    console.print("\n[bold white on #d97706] 4 [/] [bold bright_white]Select Operational Mode[/]")
-    console.print("    [bold #38bdf8]1)[/] [bold bright_white]Both[/] [dim](Download MP3s + Export/Update CSV Metadata)[/] [bold white on #059669] RECOMMENDED [/]")
-    console.print("    [bold #38bdf8]2)[/] [bold bright_white]Songs Only[/] [dim](Download MP3s without writing a CSV file)[/]")
-    console.print("    [bold #38bdf8]3)[/] [bold bright_white]CSV Only[/] [dim](Fast metadata sync to CSV without downloading audio)[/]")
+    render_step_header(
+        step_num="4",
+        title="Operational Mode",
+        subtitle="Select audio downloading and CSV archival target",
+    )
+    console.print("    [bold white on #0284c7]  1  [/]  [bold bright_white]Both[/]         [dim]Download MP3s + Export/Update CSV Metadata[/]   [bold white on #16a34a]  RECOMMENDED  [/]")
+    console.print("    [bold white on #475569]  2  [/]  [bold bright_white]Songs Only[/]   [dim]Download MP3 audio tracks without creating CSV[/]")
+    console.print("    [bold white on #475569]  3  [/]  [bold bright_white]CSV Only[/]     [dim]Fast metadata sync to CSV without downloading audio[/]")
+    console.print()
     mode_choice = Prompt.ask(
-        "    [bold #38bdf8]?[/] [bold]Choose Mode[/bold]",
+        "  [bold #00f0ff]>[/] [bold white]Choose Mode [1-3][/bold white]",
         choices=["1", "2", "3"],
         default="1",
     )
@@ -138,12 +187,17 @@ def prompt_interactive_options() -> Dict[str, Any]:
     # Step 5: Audio Quality (if downloading songs)
     selected_quality = "320"
     if selected_mode in ("all", "songs"):
-        console.print("\n[bold white on #db2777] 5 [/] [bold bright_white]Select Target Audio Bitrate[/]")
-        console.print("    [bold #38bdf8]1)[/] [bold #4ade80]320 kbps[/] [dim](Extreme Studio Fidelity)[/] [bold white on #16a34a] MAXIMUM [/]")
-        console.print("    [bold #38bdf8]2)[/] [bold #38bdf8]160 kbps[/] [dim](Standard High Quality)[/]")
-        console.print("    [bold #38bdf8]3)[/] [bold #fbbf24]96 kbps[/]  [dim](Fast / Bandwidth Saver)[/]")
+        render_step_header(
+            step_num="5",
+            title="Target Audio Bitrate",
+            subtitle="Audio stream bitrate and MP3 transcoding fidelity",
+        )
+        console.print("    [bold white on #0284c7]  1  [/]  [bold #4ade80]320 kbps[/]     [dim]Maximum Studio Fidelity (CBR 320k)[/]   [bold white on #16a34a]  MAXIMUM  [/]")
+        console.print("    [bold white on #475569]  2  [/]  [bold #38bdf8]160 kbps[/]     [dim]High Quality Standard (CBR 160k)[/]")
+        console.print("    [bold white on #475569]  3  [/]  [bold #fbbf24]96 kbps[/]      [dim]Bandwidth Saver (CBR 96k)[/]")
+        console.print()
         q_choice = Prompt.ask(
-            "    [bold #38bdf8]?[/] [bold]Choose Bitrate[/bold]",
+            "  [bold #00f0ff]>[/] [bold white]Choose Bitrate [1-3][/bold white]",
             choices=["1", "2", "3"],
             default="1",
         )
@@ -153,12 +207,17 @@ def prompt_interactive_options() -> Dict[str, Any]:
     # Step 6: Audio Stream Source
     selected_source = "auto"
     if selected_mode in ("all", "songs"):
-        console.print("\n[bold white on #4f46e5] 6 [/] [bold bright_white]Select Audio Stream Engine[/]")
-        console.print("    [bold #38bdf8]1)[/] [bold #c084fc]Auto[/] [dim](JioSaavn CDN stream + YT Music fallback)[/] [bold white on #7e22ce] DUAL ENGINE [/]")
-        console.print("    [bold #38bdf8]2)[/] [bold #38bdf8]JioSaavn Direct[/] [dim](Raw master audio stream directly from CDN)[/]")
-        console.print("    [bold #38bdf8]3)[/] [bold #f87171]YouTube Music[/] [dim](Matched audio stream via YouTube Music)[/]")
+        render_step_header(
+            step_num="6",
+            title="Audio Stream Engine",
+            subtitle="Primary audio provider and automatic fallback strategy",
+        )
+        console.print("    [bold white on #0284c7]  1  [/]  [bold #c084fc]Auto[/]            [dim]JioSaavn CDN stream + YT Music fallback[/]   [bold white on #7c3aed]  DUAL ENGINE  [/]")
+        console.print("    [bold white on #475569]  2  [/]  [bold #38bdf8]JioSaavn Direct[/] [dim]Raw master audio stream directly from Saavn CDN[/]")
+        console.print("    [bold white on #475569]  3  [/]  [bold #f87171]YouTube Music[/]   [dim]Matched audio stream via YouTube Music[/]")
+        console.print()
         src_choice = Prompt.ask(
-            "    [bold #38bdf8]?[/] [bold]Choose Engine[/bold]",
+            "  [bold #00f0ff]>[/] [bold white]Choose Engine [1-3][/bold white]",
             choices=["1", "2", "3"],
             default="1",
         )
@@ -166,24 +225,37 @@ def prompt_interactive_options() -> Dict[str, Any]:
         selected_source = src_map[src_choice]
 
     # Step 7: Filename Template
-    console.print("\n[bold white on #0d9488] 7 [/] [bold bright_white]Custom Filename Pattern[/]")
-    console.print("    [dim]Supported tags: {artist}, {title}, {album}, {year}, {track}, {id}, {duration}, {language}[/dim]")
+    render_step_header(
+        step_num="7",
+        title="Custom Filename Pattern",
+        subtitle="Tags: {artist}, {title}, {album}, {year}, {track}, {id}, {duration}, {language}",
+    )
     template = Prompt.ask(
-        "    [bold #38bdf8]?[/] [bold]Filename Pattern[/bold]",
+        "  [bold #00f0ff]>[/] [bold white]Filename Pattern[/bold white]",
         default="{artist} - {title}",
     )
 
     # Step 8: Lyrics
-    console.print("\n[bold white on #ea580c] 8 [/] [bold bright_white]ID3 Tagging & Lyrics Embedding[/]")
+    render_step_header(
+        step_num="8",
+        title="ID3 Tagging & Lyrics",
+        subtitle="Embed synchronized or full lyrics into MP3 ID3v2 USLT frames",
+    )
     fetch_lyrics = Confirm.ask(
-        "    [bold #38bdf8]?[/] [bold]Fetch and embed full lyrics into MP3 tags?[/bold]",
+        "  [bold #00f0ff]>[/] [bold white]Fetch and embed full lyrics into MP3 tags?[/bold white]",
         default=True,
     )
 
     # Step 9: Cookies file
-    console.print("\n[bold white on #dc2626] 9 [/] [bold bright_white]YouTube Music Authentication / Cookies[/] [dim](optional)[/]")
+    render_step_header(
+        step_num="9",
+        title="YouTube Music Cookies",
+        subtitle="Provide cookies.txt path for bot detection bypass & premium account audio",
+        badge="OPTIONAL",
+        badge_color="#475569",
+    )
     cookies_input = Prompt.ask(
-        "    [bold #38bdf8]?[/] [bold]Path to cookies.txt [dim](press Enter to skip)[/dim][/bold]",
+        "  [bold #00f0ff]>[/] [bold white]Path to cookies.txt[/bold white] [dim](press Enter to skip)[/dim]",
         default="",
     )
     cookies_path = cookies_input.strip() if cookies_input.strip() and os.path.exists(cookies_input.strip()) else None
@@ -204,7 +276,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
 
 
 def display_collection_header(meta: Dict[str, Any]) -> None:
-    """Displays collection header details before track listing with rich badges (no emojis)."""
+    """Displays collection header details before track listing with solid box badges and generous padding."""
     raw_type = meta.get("type", "Collection").lower()
     title = meta.get("title", "Unknown")
     artist = meta.get("artist", "")
@@ -213,45 +285,48 @@ def display_collection_header(meta: Dict[str, Any]) -> None:
 
     header_text = Text()
 
-    # Badges for types
+    # Complete solid boxes for collection types (no brackets)
     type_badge_map = {
-        "csv": (" [CSV BATCH] ", "bold white on #059669"),
-        "album": (" [ALBUM] ", "bold white on #2563eb"),
-        "playlist": (" [PLAYLIST] ", "bold white on #7c3aed"),
-        "artist": (" [ARTIST TOP] ", "bold white on #d97706"),
-        "song": (" [SINGLE] ", "bold white on #db2777"),
-        "search": (" [SEARCH RESULTS] ", "bold white on #0891b2"),
+        "csv": ("  CSV BATCH  ", "bold white on #059669"),
+        "album": ("  ALBUM  ", "bold white on #2563eb"),
+        "playlist": ("  PLAYLIST  ", "bold white on #7c3aed"),
+        "artist": ("  ARTIST TOP  ", "bold white on #d97706"),
+        "song": ("  SINGLE  ", "bold white on #db2777"),
+        "search": ("  SEARCH RESULTS  ", "bold white on #0891b2"),
     }
-    badge_label, badge_style = type_badge_map.get(raw_type, (" [COLLECTION] ", "bold white on #4b5563"))
+    badge_label, badge_style = type_badge_map.get(raw_type, ("  COLLECTION  ", "bold white on #4b5563"))
     header_text.append(badge_label, style=badge_style)
-    header_text.append(" ")
+    header_text.append("   ")
     header_text.append(title, style="bold bright_white")
 
     if artist and raw_type != "csv":
-        header_text.append("   |  ", style="dim yellow")
+        header_text.append("   |   ", style="dim yellow")
         header_text.append("Artist: ", style="bold cyan")
         header_text.append(artist, style="bright_white")
 
     if source and raw_type == "csv":
-        header_text.append("   |  ", style="dim yellow")
+        header_text.append("   |   ", style="dim yellow")
         header_text.append("Source: ", style="bold cyan")
         short_src = source if len(source) <= 50 else source[:47] + "..."
         header_text.append(short_src, style="dim white")
 
-    header_text.append("   |  ", style="dim yellow")
-    header_text.append(f" {count} TRACKS ", style="bold black on #4ade80")
+    header_text.append("   |   ", style="dim yellow")
+    header_text.append(f"  {count} TRACKS  ", style="bold black on #4ade80")
 
-    console.print(Panel(header_text, box=box.ROUNDED, border_style="bright_blue", padding=(0, 1)))
+    console.print()
+    console.print(Panel(header_text, box=box.ROUNDED, border_style="bright_blue", padding=(1, 3)))
+    console.print()
 
 
 def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> None:
-    """Displays a neat, colorful table of tracks about to be processed (no emojis)."""
+    """Displays a neat, colorful table of tracks about to be processed with solid box badges."""
     table = Table(
         title="[bold #38bdf8]=== Found Tracks Preview ===[/bold #38bdf8]",
         title_justify="left",
         box=box.ROUNDED,
         border_style="bright_blue",
         header_style="bold #c084fc",
+        padding=(0, 2),
         show_lines=False,
     )
     table.add_column("#", style="dim cyan", width=4, justify="right")
@@ -259,11 +334,11 @@ def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> Non
     table.add_column("Artist(s)", style="bold #38bdf8", min_width=20, no_wrap=True)
     table.add_column("Album", style="bold #facc15", min_width=18, no_wrap=True)
     table.add_column("Duration", style="bold #4ade80", width=10, justify="center")
-    table.add_column("Lyrics", style="bold #f472b6", width=10, justify="center")
+    table.add_column("Lyrics", style="bold #f472b6", width=12, justify="center")
 
     display_list = songs[:max_rows]
     for idx, s in enumerate(display_list):
-        lyrics_icon = "[bold #22c55e][LYRICS][/]" if s.get("has_lyrics") or s.get("lyrics") else "[dim]--[/]"
+        lyrics_pill = "[bold white on #16a34a]  LYRICS  [/]" if s.get("has_lyrics") or s.get("lyrics") else "[dim]--[/]"
         dur_fmt = s.get("duration_formatted", "00:00")
         table.add_row(
             f"{s.get('track_number') or idx + 1:02d}",
@@ -271,7 +346,7 @@ def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> Non
             (s.get("primary_artists") or s.get("artist") or "Unknown")[:28],
             s.get("album", "Unknown")[:25],
             dur_fmt,
-            lyrics_icon,
+            lyrics_pill,
         )
 
     console.print(table)
@@ -289,32 +364,32 @@ def display_summary_report(
     output_dir: str,
     elapsed_seconds: float,
 ) -> None:
-    """Renders a sleek, colorful dashboard summary card upon completion (no emojis)."""
+    """Renders a sleek, colorful dashboard summary card with solid box badges and generous padding."""
     summary_table = Table.grid(padding=(0, 2))
     summary_table.add_column(style="bold cyan", justify="right")
     summary_table.add_column(style="bright_white")
 
     summary_table.add_row(
-        "[bold white on #16a34a] COMPLETED [/]",
+        "[bold white on #16a34a]  COMPLETED  [/]",
         f"[bold bright_green]{success_count}[/] / [bold bright_white]{total}[/] tracks successfully processed",
     )
     if failed_count > 0:
         summary_table.add_row(
-            "[bold white on #dc2626] FAILED [/]",
+            "[bold white on #dc2626]   FAILED    [/]",
             f"[bold red]{failed_count}[/] tracks encountered errors or skipped",
         )
     summary_table.add_row(
-        "[bold white on #0284c7] OUTPUT [/]",
+        "[bold white on #0284c7]   OUTPUT    [/]",
         f"[bold bright_cyan]{os.path.abspath(output_dir)}[/bold bright_cyan]",
     )
     if csv_path and os.path.exists(csv_path):
         summary_table.add_row(
-            "[bold white on #7c3aed] CSV RECORD [/]",
+            "[bold white on #7c3aed] CSV RECORD  [/]",
             f"[bold bright_magenta]{os.path.abspath(csv_path)}[/bold bright_magenta]",
         )
     mins, secs = divmod(int(elapsed_seconds), 60)
     summary_table.add_row(
-        "[bold white on #d97706] TIME [/]",
+        "[bold white on #d97706]    TIME     [/]",
         f"[bold #facc15]{mins}m {secs:02d}s[/bold #facc15]",
     )
 
@@ -323,6 +398,8 @@ def display_summary_report(
         title="[bold bright_white]JSD-CSV Pipeline Complete[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_green",
-        padding=(1, 2),
+        padding=(1, 3),
     )
+    console.print()
     console.print(panel)
+    console.print()
