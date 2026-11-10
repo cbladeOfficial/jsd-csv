@@ -163,7 +163,17 @@ def format_filename(template: str, metadata: Dict[str, Any], artists_separator: 
                 clean_artists.append(s)
     elif metadata.get("artists") or metadata.get("all_artists"):
         raw_str = str(metadata.get("artists") or metadata.get("all_artists") or "")
-        for item in raw_str.split(","):
+        if "," in raw_str:
+            parts = raw_str.split(",")
+        elif " / " in raw_str:
+            parts = raw_str.split(" / ")
+        elif " | " in raw_str:
+            parts = raw_str.split(" | ")
+        elif " & " in raw_str:
+            parts = raw_str.split(" & ")
+        else:
+            parts = [raw_str]
+        for item in parts:
             s = item.strip()
             if s and s not in clean_artists:
                 clean_artists.append(s)

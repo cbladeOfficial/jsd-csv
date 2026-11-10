@@ -111,7 +111,7 @@ Supported Filename Identifiers (supports {tag} or {tag-name}):
         dest="artists_separator",
         type=str,
         default=", ",
-        help="Separator string used between multiple artists in {artists} filename tag (default: ', ').",
+        help="Separator string used between multiple artists in {artists} filename tag: ', ', '/', ' & ', ' | ' (default: ', ').",
     )
 
     parser.add_argument(

@@ -40,8 +40,18 @@ class TestArtistsSeparator(unittest.TestCase):
         res = format_filename("{artists} - {title}", self.sample_meta, artists_separator="; ")
         self.assertEqual(res, "Pritam; Arijit Singh; Amitabh Bhattacharya - Kesariya")
 
+    def test_custom_artists_separator_pipe(self):
+        # Custom separator " | "
+        res = format_filename("{artists} - {title}", self.sample_meta, artists_separator=" | ")
+        self.assertEqual(res, "Pritam _ Arijit Singh _ Amitabh Bhattacharya - Kesariya")
+
+    def test_custom_artists_separator_slash(self):
+        # Custom separator "/" without spaces
+        res = format_filename("{artists} - {title}", self.sample_meta, artists_separator="/")
+        self.assertEqual(res, "Pritam_Arijit Singh_Amitabh Bhattacharya - Kesariya")
+
     def test_custom_artists_separator_slash_sanitized(self):
-        # Custom separator "/" should be sanitized to "_" in filename component
+        # Custom separator " / " should be sanitized to "_" in filename component
         res = format_filename("{artists} - {title}", self.sample_meta, artists_separator=" / ")
         self.assertEqual(res, "Pritam _ Arijit Singh _ Amitabh Bhattacharya - Kesariya")
 
@@ -64,6 +74,14 @@ class TestArtistsSeparator(unittest.TestCase):
 
         res_custom = format_filename("{artists} - {title}", meta, artists_separator=" & ")
         self.assertEqual(res_custom, "Pritam & Arijit Singh - Channa Mereya")
+
+        # Fallback when raw string is separated by " / "
+        meta_slash = {"title": "Song", "artists": "Artist A / Artist B"}
+        self.assertEqual(format_filename("{artists} - {title}", meta_slash, artists_separator=" & "), "Artist A & Artist B - Song")
+
+        # Fallback when raw string is separated by " | "
+        meta_pipe = {"title": "Song", "artists": "Artist A | Artist B"}
+        self.assertEqual(format_filename("{artists} - {title}", meta_pipe, artists_separator=" & "), "Artist A & Artist B - Song")
 
     def test_artists_deduplication(self):
         meta = {

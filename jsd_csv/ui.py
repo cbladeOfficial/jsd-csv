@@ -306,12 +306,48 @@ def prompt_interactive_options(
         "  [bold #00f0ff]>[/] [bold white]Filename Pattern[/bold white]",
         default=str(cfg_data.get("template") or "{artist} - {title}"),
     )
-    artists_sep = str(cfg_data.get("artists_separator") if cfg_data.get("artists_separator") is not None else ", ")
+
+    # Determine default artist separator choice from existing config
+    cur_sep = str(cfg_data.get("artists_separator") if cfg_data.get("artists_separator") is not None else ", ")
+    if cur_sep in (", ", ","):
+        def_sep = "1"
+    elif cur_sep in ("/", " / "):
+        def_sep = "2"
+    elif cur_sep in ("&", " & "):
+        def_sep = "3"
+    elif cur_sep in ("|", " | "):
+        def_sep = "4"
+    else:
+        def_sep = "5"
+
+    artists_sep = cur_sep
     if any(tag in template.lower() for tag in ("{artists}", "{all_artists}", "{allartists}")):
-        artists_sep = Prompt.ask(
-            "  [bold #00f0ff]>[/] [bold white]Artists Tag Separator[/bold white] [dim](e.g. ', ' or ',' or ' & ')[/dim]",
-            default=artists_sep,
+        console.print()
+        console.print("    [bold #38bdf8]Artists Tag Separator for {artists}:[/bold #38bdf8]")
+        console.print("    [bold white on #0284c7]  1  [/]  [bold #4ade80]', '[/]     [dim]Comma-space  (e.g. Pritam, Arijit Singh)[/]     [bold white on #16a34a]  DEFAULT  [/]")
+        console.print("    [bold white on #475569]  2  [/]  [bold #38bdf8]'/'[/]      [dim]Slash        (e.g. Pritam / Arijit Singh)[/]")
+        console.print("    [bold white on #475569]  3  [/]  [bold #c084fc]' & '[/]    [dim]Ampersand    (e.g. Pritam & Arijit Singh)[/]")
+        console.print("    [bold white on #475569]  4  [/]  [bold #fbbf24]' | '[/]    [dim]Pipe         (e.g. Pritam | Arijit Singh)[/]")
+        console.print("    [bold white on #475569]  5  [/]  [bold #f87171]Custom[/]   [dim]Enter your own custom separator string[/]")
+        console.print()
+        sep_choice = Prompt.ask(
+            "  [bold #00f0ff]>[/] [bold white]Choose Separator [1-5][/bold white]",
+            choices=["1", "2", "3", "4", "5", ", ", "/", " / ", "&", " & ", "|", " | "],
+            default=def_sep,
         )
+        if sep_choice in ("1", ", "):
+            artists_sep = ", "
+        elif sep_choice in ("2", "/", " / "):
+            artists_sep = "/" if sep_choice == "/" else " / "
+        elif sep_choice in ("3", "&", " & "):
+            artists_sep = " & "
+        elif sep_choice in ("4", "|", " | "):
+            artists_sep = "|" if sep_choice == "|" else " | "
+        else:
+            artists_sep = Prompt.ask(
+                "  [bold #00f0ff]>[/] [bold white]Enter Custom Separator[/bold white]",
+                default=cur_sep if cur_sep not in (", ", "/", " / ", " & ", " | ", "|") else ", ",
+            )
 
     # Step 8: Lyrics
     render_step_header(
