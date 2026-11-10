@@ -368,7 +368,7 @@ def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> Non
         row = [
             f"{s.get('track_number') or idx + 1:02d}",
             s.get("title", "Unknown"),
-            s.get("primary_artists") or s.get("artist") or "Unknown",
+            s.get("artists") or s.get("primary_artists") or s.get("artist") or "Unknown",
             s.get("album", "Unknown"),
         ]
         if has_year:

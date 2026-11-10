@@ -20,6 +20,7 @@ CSV_HEADERS = [
     "Track Number",
     "Title",
     "Artists",
+    "Album Artist",
     "Primary Artist",
     "Album",
     "Year",
@@ -35,7 +36,6 @@ CSV_HEADERS = [
     "Album Art URL",
     "Has Lyrics",
     "Lyrics Snippet",
-    "Full Lyrics",
     "YT Music Title",
     "YT Music Video ID",
     "YT Music URL",
@@ -49,13 +49,18 @@ CSV_HEADERS = [
 
 def format_row(item: Dict[str, Any]) -> List[Any]:
     """Flattens a song record dictionary into a CSV row."""
-    full_lyrics = item.get("lyrics", "") or ""
-    
+    artists = item.get("artists") or item.get("all_artists") or item.get("artist") or ""
+    album_artist = item.get("album_artist") or item.get("music") or ""
+    primary_artist = item.get("primary_artists") or (artists.split(",")[0].strip() if artists else "")
+    if not album_artist:
+        album_artist = primary_artist
+
     return [
         item.get("track_number", ""),
         item.get("title", ""),
-        item.get("all_artists", ""),
-        item.get("primary_artists", ""),
+        artists,
+        album_artist,
+        primary_artist,
         item.get("album", ""),
         item.get("year", ""),
         item.get("release_date", ""),
@@ -70,7 +75,6 @@ def format_row(item: Dict[str, Any]) -> List[Any]:
         item.get("image", ""),
         "Yes" if item.get("has_lyrics") else "No",
         item.get("lyrics_snippet", ""),
-        full_lyrics,
         item.get("yt_title", ""),
         item.get("yt_video_id", ""),
         item.get("yt_url", ""),
@@ -147,11 +151,14 @@ def load_csv(source: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
 
         raw_title = get_val(r, "Title", "Song", "Track Name", default=f"Track {idx}")
         raw_artists = get_val(r, "Artists", "All Artists", default="")
+        raw_album_artist = get_val(r, "Album Artist", default="")
         raw_primary = get_val(r, "Primary Artist", "Artist", default="")
         if not raw_primary and raw_artists:
             raw_primary = raw_artists.split(",")[0].strip()
         if not raw_artists and raw_primary:
             raw_artists = raw_primary
+        if not raw_album_artist:
+            raw_album_artist = raw_primary
 
         raw_album = get_val(r, "Album", default="")
         raw_year = get_val(r, "Year", default="")
@@ -180,7 +187,9 @@ def load_csv(source: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         song_dict = {
             "track_number": track_num,
             "title": raw_title,
+            "artists": raw_artists,
             "all_artists": raw_artists,
+            "album_artist": raw_album_artist,
             "primary_artists": raw_primary,
             "artist": raw_primary,
             "album": raw_album,

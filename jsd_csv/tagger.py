@@ -20,6 +20,7 @@ from mutagen.id3 import (
     TDRC,
     TIT2,
     TPE1,
+    TPE2,
     TPUB,
     TRCK,
     USLT,
@@ -59,10 +60,32 @@ def embed_metadata(
         if title:
             tags.setall("TIT2", [TIT2(encoding=3, text=title)])
 
-        # Artists
-        artists = song_metadata.get("all_artists") or song_metadata.get("primary_artists") or song_metadata.get("artist") or ""
-        if artists:
-            tags.setall("TPE1", [TPE1(encoding=3, text=artists)])
+        # Track Artists (TPE1) - Deduplicated essential musical performers only (no actors/cast)
+        raw_artists = (
+            song_metadata.get("artists")
+            or song_metadata.get("all_artists")
+            or song_metadata.get("primary_artists")
+            or song_metadata.get("artist")
+            or ""
+        )
+        clean_artists_list = []
+        seen_artists = set()
+        for a in [x.strip() for x in raw_artists.split(",") if x.strip()]:
+            if a.lower() not in seen_artists:
+                seen_artists.add(a.lower())
+                clean_artists_list.append(a)
+        clean_artists = ", ".join(clean_artists_list)
+        if clean_artists:
+            tags.setall("TPE1", [TPE1(encoding=3, text=clean_artists)])
+
+        # Album Artist (TPE2) - Separate dedicated tag for Album Artist / Music Composer
+        album_artist = (
+            song_metadata.get("album_artist")
+            or song_metadata.get("music")
+            or (clean_artists_list[0] if clean_artists_list else "")
+        )
+        if album_artist:
+            tags.setall("TPE2", [TPE2(encoding=3, text=str(album_artist).strip())])
 
         # Album
         album = song_metadata.get("album", "")

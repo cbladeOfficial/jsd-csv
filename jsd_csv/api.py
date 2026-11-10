@@ -108,21 +108,66 @@ class JioSaavnAPI:
         """Normalizes raw JioSaavn song object into a rich, structured dictionary."""
         more_info = raw.get("more_info", {}) or {}
 
-        # Extract artists
+        # Extract artists: Cleanly separate essential musical performers from actors/starring cast
         artist_map = more_info.get("artistMap", {}) or {}
         primary_artists_list = artist_map.get("primary_artists", [])
-        if primary_artists_list:
-            primary_artist = ", ".join(html.unescape(a.get("name", "")) for a in primary_artists_list if a.get("name"))
-        else:
-            primary_artist = html.unescape(more_info.get("music", "") or raw.get("subtitle", "") or "Unknown Artist")
+        featured_artists_list = artist_map.get("featured_artists", [])
 
-        all_artists_list = artist_map.get("artists", [])
-        if all_artists_list:
-            all_artists = ", ".join(html.unescape(a.get("name", "")) for a in all_artists_list if a.get("name"))
-        elif more_info.get("singers"):
-            all_artists = html.unescape(more_info.get("singers", ""))
-        else:
-            all_artists = primary_artist
+        unique_artists: List[str] = []
+        seen_artists = set()
+
+        def add_artist(name: str) -> None:
+            if not name:
+                return
+            clean_name = html.unescape(name).strip()
+            # If compound comma-separated string, process each individual artist
+            for p in [x.strip() for x in clean_name.split(",") if x.strip()]:
+                norm = p.lower()
+                if norm not in seen_artists:
+                    seen_artists.add(norm)
+                    unique_artists.append(p)
+
+        # 1. Primary musical artists
+        for a in primary_artists_list:
+            if isinstance(a, dict) and a.get("role") != "starring":
+                add_artist(a.get("name", ""))
+
+        # 2. Featured artists (singers, vocalists)
+        for a in featured_artists_list:
+            if isinstance(a, dict) and a.get("role") != "starring":
+                add_artist(a.get("name", ""))
+
+        # 3. Fallback: singers field in more_info
+        if not unique_artists and more_info.get("singers"):
+            add_artist(more_info.get("singers", ""))
+
+        # 4. Fallback: artists list (excluding actors / starring cast)
+        if not unique_artists:
+            for a in artist_map.get("artists", []):
+                if isinstance(a, dict) and a.get("role") not in ("starring", "actor"):
+                    add_artist(a.get("name", ""))
+
+        # 5. Fallback: music composer or subtitle
+        if not unique_artists and more_info.get("music"):
+            add_artist(more_info.get("music", ""))
+        if not unique_artists and raw.get("subtitle"):
+            add_artist(raw.get("subtitle", ""))
+
+        essential_artists = ", ".join(unique_artists) if unique_artists else "Unknown Artist"
+        primary_artist_str = unique_artists[0] if unique_artists else "Unknown Artist"
+
+        # Album Artist: music composer for soundtracks (when matching primary artists), or primary musical artist
+        raw_music = (more_info.get("music") or "").strip()
+        album_artist = ""
+        if raw_music and primary_artists_list:
+            music_parts = [p.strip().lower() for p in raw_music.split(",") if p.strip()]
+            for a in primary_artists_list:
+                aname = html.unescape(a.get("name", "")).strip()
+                if aname.lower() in music_parts or any(mp in aname.lower() for mp in music_parts):
+                    album_artist = aname
+                    break
+        if not album_artist:
+            album_artist = primary_artist_str
 
         # Clean title and album
         raw_title = raw.get("title") or raw.get("song") or "Unknown Title"
@@ -165,9 +210,11 @@ class JioSaavnAPI:
         return {
             "id": raw.get("id", ""),
             "title": title,
-            "artist": primary_artist,
-            "primary_artists": primary_artist,
-            "all_artists": all_artists,
+            "artist": essential_artists,
+            "artists": essential_artists,
+            "primary_artists": primary_artist_str,
+            "all_artists": essential_artists,
+            "album_artist": album_artist,
             "album": album,
             "album_id": more_info.get("album_id", ""),
             "album_url": more_info.get("album_url", ""),
@@ -256,6 +303,10 @@ class JioSaavnAPI:
         image = self.upgrade_image_url(res.get("image", ""))
 
         parsed = [self.format_song_item(s, idx + 1) for idx, s in enumerate(raw_songs)]
+        if primary_artist:
+            for s in parsed:
+                if not s.get("album_artist") or s.get("album_artist") == "Unknown Artist":
+                    s["album_artist"] = primary_artist
         meta = {
             "type": "album",
             "title": album_name,

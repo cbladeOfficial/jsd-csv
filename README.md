@@ -206,14 +206,15 @@ Identifiers are **case-insensitive** and automatically sanitized for Windows, Li
 
 ## 📊 CSV Metadata Schema
 
-The generated CSV file contains 27 comprehensive fields encoded in `utf-8-sig`:
+The generated CSV file contains 27 comprehensive fields encoded in `utf-8-sig` *(Note: Multi-line Full Lyrics are cleanly embedded directly into the MP3 ID3 tags (`USLT`) rather than bloating the CSV spreadsheet)*:
 
 | Column | Description |
 | :--- | :--- |
 | `Track Number` | Track order index in the collection |
 | `Title` | Unescaped song title |
-| `Artists` | Full list of featured and collaborating artists |
-| `Primary Artist` | Lead vocalist / composer |
+| `Artists` | Deduplicated essential track artists (singers & featured; excluding movie cast) |
+| `Album Artist` | Album artist or primary music composer |
+| `Primary Artist` | Lead vocalist or composer |
 | `Album` | Album or soundtrack title |
 | `Year` | Release year |
 | `Release Date` | Full release date (YYYY-MM-DD) |
@@ -228,7 +229,6 @@ The generated CSV file contains 27 comprehensive fields encoded in `utf-8-sig`:
 | `Album Art URL` | Direct link to high-resolution 500x500 cover art |
 | `Has Lyrics` | `Yes` or `No` |
 | `Lyrics Snippet` | Short teaser lyrics |
-| `Full Lyrics` | Complete clean plaintext lyrics |
 | `YT Music Title` | Matched YouTube Music track title |
 | `YT Music Video ID` | Matched YouTube video ID |
 | `YT Music URL` | Direct YouTube Music stream URL |

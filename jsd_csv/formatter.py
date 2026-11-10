@@ -105,7 +105,8 @@ def format_filename(template: str, metadata: Dict[str, Any]) -> str:
     lookup: Dict[str, str] = {
         "title": str(metadata.get("title") or "Unknown Title"),
         "artist": str(metadata.get("primary_artists") or metadata.get("primary_artist") or metadata.get("artist") or "Unknown Artist"),
-        "artists": str(metadata.get("all_artists") or metadata.get("artists") or "Unknown Artists"),
+        "artists": str(metadata.get("artists") or metadata.get("all_artists") or "Unknown Artists"),
+        "album_artist": str(metadata.get("album_artist") or metadata.get("music") or ""),
         "album": str(metadata.get("album") or "Unknown Album"),
         "year": str(metadata.get("year") or ""),
         "track": padded_track,
