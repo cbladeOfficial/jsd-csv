@@ -193,6 +193,7 @@ class DownloaderEngine:
         embed_cover: bool = True,
         cookies_file: Optional[str] = None,
         csv_filename: Optional[str] = None,
+        id3_version: int = 4,
     ):
         self.output_dir = os.path.abspath(output_dir)
         self.mode = mode.lower()
@@ -203,6 +204,7 @@ class DownloaderEngine:
         self.embed_cover = embed_cover
         self.cookies_file = cookies_file
         self.csv_filename = csv_filename
+        self.id3_version = int(id3_version) if id3_version in (3, 4) else 4
 
         os.makedirs(self.output_dir, exist_ok=True)
 
@@ -495,6 +497,7 @@ class DownloaderEngine:
                 lyrics=song.get("lyrics"),
                 embed_cover=self.embed_cover,
                 session=self.session,
+                id3_version=self.id3_version,
             )
             return True
 
@@ -567,6 +570,7 @@ class DownloaderEngine:
             lyrics=song.get("lyrics"),
             embed_cover=self.embed_cover,
             session=self.session,
+            id3_version=self.id3_version,
         )
 
         if progress and track_task is not None:

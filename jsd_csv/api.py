@@ -212,6 +212,7 @@ class JioSaavnAPI:
             "title": title,
             "artist": essential_artists,
             "artists": essential_artists,
+            "artists_list": unique_artists if unique_artists else [essential_artists],
             "primary_artists": primary_artist_str,
             "all_artists": essential_artists,
             "album_artist": album_artist,

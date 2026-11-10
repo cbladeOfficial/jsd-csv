@@ -184,10 +184,13 @@ def load_csv(source: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
 
         has_lyrics_val = str(get_val(r, "Has Lyrics", default="false")).lower() in ("yes", "true", "1")
 
+        clean_artists_list = [a.strip() for a in raw_artists.split(",") if a.strip()]
+
         song_dict = {
             "track_number": track_num,
             "title": raw_title,
             "artists": raw_artists,
+            "artists_list": clean_artists_list if clean_artists_list else [raw_artists],
             "all_artists": raw_artists,
             "album_artist": raw_album_artist,
             "primary_artists": raw_primary,

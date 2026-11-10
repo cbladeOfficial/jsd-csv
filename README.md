@@ -170,6 +170,9 @@ python main.py [OPTIONS]
 | `-q` | `--quality` | Target audio bitrate: `320`, `160`, or `96` kbps | `320` |
 | `-s` | `--source` | Audio stream source: `auto`, `saavn`, or `ytmusic` | `auto` |
 | `-c` | `--cookies` | Path to Netscape-format `cookies.txt` file for YouTube Music | *None* |
+| `-C` | `--config` | Load download settings from a JSON configuration file | *None* |
+| | `--save-config` | Save current parameters to a JSON configuration file | `config.json` |
+| | `--id3-version` | ID3v2 tag version to write: `4` (native multi-artist) or `3` (legacy) | `4` |
 | | `--lyrics` / `--no-lyrics` | Enable or disable full lyrics retrieval and embedding | Enabled |
 | | `--cover` / `--no-cover` | Enable or disable high-resolution album cover embedding | Enabled |
 | | `--csv-name` | Custom name for the generated CSV metadata file | *Collection title* |
@@ -237,6 +240,52 @@ The generated CSV file contains 27 comprehensive fields encoded in `utf-8-sig` *
 | `Filename` | Local sanitized filename |
 | `File Path` | Absolute path to the saved MP3 file |
 | `Download Status` | Status: `Downloaded`, `CSV Only`, or `Failed` |
+
+---
+
+## 💾 Configuration Profiles (`config.json`)
+
+To avoid re-typing parameters every time, you can save your inputs into a JSON profile, edit it directly in any text editor, and re-run with one command:
+
+```bash
+# Save your current parameters into config.json
+python main.py -u "Kesariya" -o ./my_music -q 320 --save-config config.json
+
+# Run directly from the configuration file
+python main.py -C config.json
+
+# Skip confirmation and run immediately
+python main.py -C config.json -y
+```
+
+Example `config.json`:
+```json
+{
+    "url": "https://www.jiosaavn.com/album/rockstar/C3Br8V0qKrc_",
+    "csv": "",
+    "output": "./downloads",
+    "mode": "all",
+    "quality": "320",
+    "source": "auto",
+    "template": "{track} - {title}",
+    "lyrics": true,
+    "cover": true,
+    "cookies": null,
+    "id3_version": 4
+}
+```
+
+When running in interactive wizard mode, JSD-CSV automatically detects any existing `config.json` in the current folder, displays a summary card, and asks if you'd like to run directly or use it as defaults.
+
+---
+
+## 🎵 Multi-Artist Tagging & Media Player Support
+
+JSD-CSV ensures collaborating artists are separated into distinct discrete entities rather than lumped into a single comma-separated text string:
+
+- **ID3v2.4 Null Separation (`TPE1`)**: Multiple track artists (singers, featured artists) are stored as discrete strings separated by null bytes (`\x00`), allowing modern players (**foobar2000**, **MusicBee**, **Plex**, **Kodi**, **Navidrome**, **Poweramp**) to index each artist under their individual library pages.
+- **Dedicated User Frames (`TXXX:ARTISTS` & `TXXX:Artists`)**: Compatible with **MusicBrainz Picard**, **Mp3tag**, and advanced tagging engines.
+- **Album Artist Separation (`TPE2` & `TXXX:ALBUMARTISTS`)**: Preserves the primary album composer/artist, preventing collaborative tracks from fracturing your album into multiple fragmented entries.
 
 ---
 

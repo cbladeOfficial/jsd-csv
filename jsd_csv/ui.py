@@ -16,6 +16,8 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.text import Text
 
+from .config import find_default_config, load_config, save_config
+
 # Force UTF-8 stdout encoding on Windows to prevent legacy charmap crashes
 if sys.platform.startswith("win"):
     try:
@@ -126,9 +128,13 @@ def render_step_header(
     console.print()
 
 
-def prompt_interactive_options() -> Dict[str, Any]:
+def prompt_interactive_options(
+    existing_config: Optional[Dict[str, Any]] = None,
+    config_filename: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Runs the sleek interactive setup wizard with solid box badges, generous padding, and elegant spacing.
+    Supports pre-filling defaults from an existing config profile, one-click execution, and saving profiles.
     Returns a dictionary of parsed options.
     """
     wizard_panel = Panel(
@@ -142,6 +148,46 @@ def prompt_interactive_options() -> Dict[str, Any]:
     )
     console.print(wizard_panel)
 
+    cfg = existing_config
+    if not cfg:
+        found_cfg_file = find_default_config()
+        if found_cfg_file:
+            try:
+                cfg = load_config(found_cfg_file)
+                config_filename = found_cfg_file
+            except Exception:
+                cfg = None
+
+    if cfg:
+        src_label = os.path.basename(config_filename) if config_filename else "preset"
+        render_step_header(
+            step_num="0",
+            title="Saved Configuration Profile Found",
+            subtitle=f"Detected existing settings profile '{src_label}'",
+            badge="PROFILE",
+            badge_color="#7c3aed",
+        )
+        grid = Table.grid(padding=(0, 3))
+        grid.add_column(style="bold cyan", width=16)
+        grid.add_column(style="bright_white")
+        if cfg.get("url"):
+            grid.add_row("URL / Query:", str(cfg.get("url")))
+        if cfg.get("csv"):
+            grid.add_row("CSV Batch:", str(cfg.get("csv")))
+        grid.add_row("Output Folder:", str(cfg.get("output", "./downloads")))
+        grid.add_row("Mode / Quality:", f"{cfg.get('mode', 'all')} @ {cfg.get('quality', '320')} kbps")
+        grid.add_row("Source / Tagging:", f"{cfg.get('source', 'auto')} (Lyrics: {'Yes' if cfg.get('lyrics', True) else 'No'})")
+        grid.add_row("Template:", str(cfg.get("template", "{artist} - {title}")))
+        console.print(Panel(grid, box=box.ROUNDED, border_style="#7c3aed", padding=(1, 3)))
+        console.print()
+        if Confirm.ask("  [bold #00f0ff]>[/] [bold white]Run directly with these saved settings?[/bold white]", default=True):
+            console.print("    [bold green]Proceeding with saved settings profile.[/bold green]\n")
+            return cfg
+        else:
+            console.print("    [dim]Starting wizard using saved profile values as defaults.[/dim]\n")
+
+    cfg_data = cfg or {}
+
     # Step 1: Optional CSV
     render_step_header(
         step_num="1",
@@ -152,7 +198,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
     )
     csv_input = Prompt.ask(
         "  [bold #00f0ff]>[/] [bold white]CSV File Path or Online URL[/bold white] [dim](press Enter to skip)[/dim]",
-        default="",
+        default=str(cfg_data.get("csv") or ""),
     ).strip().strip("'\"")
 
     url_input = ""
@@ -163,9 +209,11 @@ def prompt_interactive_options() -> Dict[str, Any]:
             title="JioSaavn Link or Search Query",
             subtitle="Song, Album, Playlist, Artist link or free-text search keywords",
         )
+        default_url = str(cfg_data.get("url") or "")
         while True:
             url_input = Prompt.ask(
-                "  [bold #00f0ff]>[/] [bold white]JioSaavn URL or Search Keywords[/bold white]"
+                "  [bold #00f0ff]>[/] [bold white]JioSaavn URL or Search Keywords[/bold white]",
+                default=default_url,
             )
             if url_input.strip():
                 break
@@ -184,7 +232,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
     )
     out_dir = Prompt.ask(
         "  [bold #00f0ff]>[/] [bold white]Destination Folder[/bold white]",
-        default="./downloads",
+        default=str(cfg_data.get("output") or "./downloads"),
     )
 
     # Step 4: Mode Selection
@@ -197,16 +245,17 @@ def prompt_interactive_options() -> Dict[str, Any]:
     console.print("    [bold white on #475569]  2  [/]  [bold bright_white]Songs Only[/]   [dim]Download MP3 audio tracks without creating CSV[/]")
     console.print("    [bold white on #475569]  3  [/]  [bold bright_white]CSV Only[/]     [dim]Fast metadata sync to CSV without downloading audio[/]")
     console.print()
+    def_mode_choice = {"all": "1", "songs": "2", "csv": "3"}.get(cfg_data.get("mode", "all"), "1")
     mode_choice = Prompt.ask(
         "  [bold #00f0ff]>[/] [bold white]Choose Mode [1-3][/bold white]",
         choices=["1", "2", "3"],
-        default="1",
+        default=def_mode_choice,
     )
     mode_map = {"1": "all", "2": "songs", "3": "csv"}
     selected_mode = mode_map[mode_choice]
 
     # Step 5: Audio Quality (if downloading songs)
-    selected_quality = "320"
+    selected_quality = str(cfg_data.get("quality", "320"))
     if selected_mode in ("all", "songs"):
         render_step_header(
             step_num="5",
@@ -217,16 +266,17 @@ def prompt_interactive_options() -> Dict[str, Any]:
         console.print("    [bold white on #475569]  2  [/]  [bold #38bdf8]160 kbps[/]     [dim]High Quality Standard (CBR 160k)[/]")
         console.print("    [bold white on #475569]  3  [/]  [bold #fbbf24]96 kbps[/]      [dim]Bandwidth Saver (CBR 96k)[/]")
         console.print()
+        def_q_choice = {"320": "1", "160": "2", "96": "3"}.get(str(cfg_data.get("quality", "320")), "1")
         q_choice = Prompt.ask(
             "  [bold #00f0ff]>[/] [bold white]Choose Bitrate [1-3][/bold white]",
             choices=["1", "2", "3"],
-            default="1",
+            default=def_q_choice,
         )
         q_map = {"1": "320", "2": "160", "3": "96"}
         selected_quality = q_map[q_choice]
 
     # Step 6: Audio Stream Source
-    selected_source = "auto"
+    selected_source = str(cfg_data.get("source", "auto"))
     if selected_mode in ("all", "songs"):
         render_step_header(
             step_num="6",
@@ -237,10 +287,11 @@ def prompt_interactive_options() -> Dict[str, Any]:
         console.print("    [bold white on #475569]  2  [/]  [bold #38bdf8]JioSaavn Direct[/] [dim]Raw master audio stream directly from Saavn CDN[/]")
         console.print("    [bold white on #475569]  3  [/]  [bold #f87171]YouTube Music[/]   [dim]Matched audio stream via YouTube Music[/]")
         console.print()
+        def_src_choice = {"auto": "1", "saavn": "2", "ytmusic": "3"}.get(str(cfg_data.get("source", "auto")), "1")
         src_choice = Prompt.ask(
             "  [bold #00f0ff]>[/] [bold white]Choose Engine [1-3][/bold white]",
             choices=["1", "2", "3"],
-            default="1",
+            default=def_src_choice,
         )
         src_map = {"1": "auto", "2": "saavn", "3": "ytmusic"}
         selected_source = src_map[src_choice]
@@ -253,7 +304,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
     )
     template = Prompt.ask(
         "  [bold #00f0ff]>[/] [bold white]Filename Pattern[/bold white]",
-        default="{artist} - {title}",
+        default=str(cfg_data.get("template") or "{artist} - {title}"),
     )
 
     # Step 8: Lyrics
@@ -264,7 +315,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
     )
     fetch_lyrics = Confirm.ask(
         "  [bold #00f0ff]>[/] [bold white]Fetch and embed full lyrics into MP3 tags?[/bold white]",
-        default=True,
+        default=bool(cfg_data.get("lyrics", True)),
     )
 
     # Step 9: Cookies file
@@ -277,9 +328,42 @@ def prompt_interactive_options() -> Dict[str, Any]:
     )
     cookies_input = Prompt.ask(
         "  [bold #00f0ff]>[/] [bold white]Path to cookies.txt[/bold white] [dim](press Enter to skip)[/dim]",
-        default="",
+        default=str(cfg_data.get("cookies") or ""),
     )
     cookies_path = cookies_input.strip() if cookies_input.strip() and os.path.exists(cookies_input.strip()) else None
+
+    # Step 10: Save configuration profile
+    render_step_header(
+        step_num="10",
+        title="Save Settings Profile",
+        subtitle="Save these parameters to a JSON config file to edit and rerun without retyping",
+        badge="OPTIONAL",
+        badge_color="#475569",
+    )
+    save_cfg_confirm = Confirm.ask(
+        "  [bold #00f0ff]>[/] [bold white]Save current settings to a config file?[/bold white]",
+        default=False,
+    )
+    if save_cfg_confirm:
+        save_path = Prompt.ask(
+            "  [bold #00f0ff]>[/] [bold white]Config file path or name[/bold white]",
+            default=config_filename or "config.json",
+        ).strip() or "config.json"
+        saved_file = save_config({
+            "url": url_input.strip(),
+            "csv": csv_input.strip(),
+            "output": out_dir.strip(),
+            "mode": selected_mode,
+            "quality": selected_quality,
+            "source": selected_source,
+            "template": template.strip(),
+            "lyrics": fetch_lyrics,
+            "cover": True,
+            "cookies": cookies_path,
+            "id3_version": int(cfg_data.get("id3_version", 4)),
+        }, save_path)
+        console.print(f"    [bold green]Settings profile saved to:[/] [bold cyan]{saved_file}[/bold cyan]")
+        console.print(f"    [dim]You can edit this file in any text editor and rerun anytime with:[/] [bold #38bdf8]python main.py -C {save_path}[/bold #38bdf8]\n")
 
     console.print()
     return {
@@ -293,6 +377,7 @@ def prompt_interactive_options() -> Dict[str, Any]:
         "lyrics": fetch_lyrics,
         "cookies": cookies_path,
         "cover": True,
+        "id3_version": int(cfg_data.get("id3_version", 4)),
     }
 
 

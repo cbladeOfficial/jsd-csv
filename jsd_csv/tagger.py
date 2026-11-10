@@ -23,6 +23,7 @@ from mutagen.id3 import (
     TPE2,
     TPUB,
     TRCK,
+    TXXX,
     USLT,
 )
 
@@ -35,9 +36,11 @@ def embed_metadata(
     lyrics: Optional[str] = None,
     embed_cover: bool = True,
     session: Optional[requests.Session] = None,
+    id3_version: int = 4,
 ) -> bool:
     """
     Embeds complete ID3v2 tags and cover art into an MP3 file.
+    Supports native discrete multi-artist separation across TPE1, TXXX:ARTISTS, and TPE2.
     
     Args:
         mp3_file_path: Path to the .mp3 file.
@@ -45,6 +48,7 @@ def embed_metadata(
         lyrics: Clean full plaintext lyrics (optional).
         embed_cover: Whether to download and embed the high-res cover image.
         session: Requests session for downloading artwork.
+        id3_version: ID3v2 tag version to write (default 4 for native multi-value frames, or 3).
         
     Returns:
         True if tagged successfully, False otherwise.
@@ -60,32 +64,47 @@ def embed_metadata(
         if title:
             tags.setall("TIT2", [TIT2(encoding=3, text=title)])
 
-        # Track Artists (TPE1) - Deduplicated essential musical performers only (no actors/cast)
-        raw_artists = (
-            song_metadata.get("artists")
-            or song_metadata.get("all_artists")
-            or song_metadata.get("primary_artists")
-            or song_metadata.get("artist")
-            or ""
-        )
+        # Track Artists: discrete list of essential musical performers (excluding actors/cast)
+        raw_list = song_metadata.get("artists_list")
         clean_artists_list = []
         seen_artists = set()
-        for a in [x.strip() for x in raw_artists.split(",") if x.strip()]:
-            if a.lower() not in seen_artists:
-                seen_artists.add(a.lower())
-                clean_artists_list.append(a)
-        clean_artists = ", ".join(clean_artists_list)
-        if clean_artists:
-            tags.setall("TPE1", [TPE1(encoding=3, text=clean_artists)])
+        if raw_list and isinstance(raw_list, list):
+            for a in raw_list:
+                s = str(a).strip()
+                if s and s.lower() not in seen_artists:
+                    seen_artists.add(s.lower())
+                    clean_artists_list.append(s)
+        else:
+            raw_artists = (
+                song_metadata.get("artists")
+                or song_metadata.get("all_artists")
+                or song_metadata.get("primary_artists")
+                or song_metadata.get("artist")
+                or ""
+            )
+            for a in [x.strip() for x in str(raw_artists).split(",") if x.strip()]:
+                if a.lower() not in seen_artists:
+                    seen_artists.add(a.lower())
+                    clean_artists_list.append(a)
 
-        # Album Artist (TPE2) - Separate dedicated tag for Album Artist / Music Composer
+        if clean_artists_list:
+            # 1. Official ID3 TPE1 frame with discrete list of artists (null-separated in v2.4, slash-separated in v2.3)
+            tags.setall("TPE1", [TPE1(encoding=3, text=clean_artists_list)])
+            # 2. De facto standard multi-artist user-defined text frames (MusicBrainz Picard, Kodi, MusicBee, Foobar2000)
+            tags.setall("TXXX:ARTISTS", [TXXX(encoding=3, desc="ARTISTS", text=clean_artists_list)])
+            tags.setall("TXXX:Artists", [TXXX(encoding=3, desc="Artists", text=clean_artists_list)])
+
+        # Album Artist (TPE2 & TXXX:ALBUMARTISTS) - Dedicated tags for Album Artist / Music Composer
         album_artist = (
             song_metadata.get("album_artist")
             or song_metadata.get("music")
             or (clean_artists_list[0] if clean_artists_list else "")
         )
         if album_artist:
-            tags.setall("TPE2", [TPE2(encoding=3, text=str(album_artist).strip())])
+            album_artist_str = str(album_artist).strip()
+            tags.setall("TPE2", [TPE2(encoding=3, text=[album_artist_str])])
+            tags.setall("TXXX:ALBUMARTISTS", [TXXX(encoding=3, desc="ALBUMARTISTS", text=[album_artist_str])])
+            tags.setall("TXXX:ALBUM ARTIST", [TXXX(encoding=3, desc="ALBUM ARTIST", text=[album_artist_str])])
 
         # Album
         album = song_metadata.get("album", "")
@@ -166,7 +185,7 @@ def embed_metadata(
                 except Exception as e:
                     logger.debug(f"Failed to embed album cover from {img_source}: {e}")
 
-        tags.save(mp3_file_path, v2_version=3)
+        tags.save(mp3_file_path, v2_version=id3_version)
         return True
     except Exception as e:
         logger.error(f"Failed to tag MP3 file '{mp3_file_path}': {e}")
