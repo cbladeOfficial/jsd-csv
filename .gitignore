@@ -17,6 +17,8 @@ downloads/
 *.tmp
 *.log
 cookies.txt
+cookies*.txt
+*cookies*.txt
 
 # Virtual environments
 venv/

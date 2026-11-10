@@ -340,35 +340,41 @@ def display_collection_header(meta: Dict[str, Any]) -> None:
 
 
 def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> None:
-    """Displays a neat, colorful table of tracks about to be processed with solid box badges."""
+    """Displays a neat, responsive table of tracks about to be processed with solid box badges."""
+    has_year = console.width >= 105
+
     table = Table(
         title="[bold #38bdf8]=== Found Tracks Preview ===[/bold #38bdf8]",
         title_justify="left",
         box=box.ROUNDED,
         border_style="bright_blue",
         header_style="bold #c084fc",
-        padding=(0, 2),
-        show_lines=False,
+        padding=(0, 1),
+        expand=True,
     )
-    table.add_column("#", style="dim cyan", width=4, justify="right")
-    table.add_column("Title", style="bold bright_white", min_width=25, no_wrap=True)
-    table.add_column("Artist(s)", style="bold #38bdf8", min_width=20, no_wrap=True)
-    table.add_column("Album", style="bold #facc15", min_width=18, no_wrap=True)
-    table.add_column("Duration", style="bold #4ade80", width=10, justify="center")
-    table.add_column("Lyrics", style="bold #f472b6", width=12, justify="center")
+    table.add_column("#", style="dim cyan", width=3, justify="right", no_wrap=True)
+    table.add_column("Title", style="bold bright_white", ratio=3, no_wrap=True, overflow="ellipsis")
+    table.add_column("Artist(s)", style="bold #38bdf8", ratio=2, no_wrap=True, overflow="ellipsis")
+    table.add_column("Album", style="bold #facc15", ratio=2, no_wrap=True, overflow="ellipsis")
+    if has_year:
+        table.add_column("Year", style="bold #fbbf24", width=6, justify="center", no_wrap=True)
+    table.add_column("Duration", style="bold #4ade80", width=8, justify="center", no_wrap=True)
+    table.add_column("Lyrics", style="bold #f472b6", width=10, justify="center", no_wrap=True)
 
     display_list = songs[:max_rows]
     for idx, s in enumerate(display_list):
-        lyrics_pill = "[bold white on #16a34a]  LYRICS  [/]" if s.get("has_lyrics") or s.get("lyrics") else "[dim]--[/]"
+        lyrics_pill = "[bold white on #16a34a] LYRICS [/]" if (s.get("has_lyrics") or s.get("lyrics")) else "[dim]--[/]"
         dur_fmt = s.get("duration_formatted", "00:00")
-        table.add_row(
+        row = [
             f"{s.get('track_number') or idx + 1:02d}",
-            s.get("title", "Unknown")[:35],
-            (s.get("primary_artists") or s.get("artist") or "Unknown")[:28],
-            s.get("album", "Unknown")[:25],
-            dur_fmt,
-            lyrics_pill,
-        )
+            s.get("title", "Unknown"),
+            s.get("primary_artists") or s.get("artist") or "Unknown",
+            s.get("album", "Unknown"),
+        ]
+        if has_year:
+            row.append(str(s.get("year") or "--"))
+        row.extend([dur_fmt, lyrics_pill])
+        table.add_row(*row)
 
     console.print(table)
     if len(songs) > max_rows:
@@ -385,32 +391,35 @@ def display_summary_report(
     output_dir: str,
     elapsed_seconds: float,
 ) -> None:
-    """Renders a sleek, colorful dashboard summary card with solid box badges and generous padding."""
-    summary_table = Table.grid(padding=(0, 2))
-    summary_table.add_column(style="bold cyan", justify="right")
+    """Renders a sleek, colorful dashboard summary card with consistent-width solid boxes and generous spacing."""
+    def make_badge(text: str, bg: str, width: int = 14) -> str:
+        return f"[bold white on {bg}]{text.center(width)}[/]"
+
+    summary_table = Table.grid(padding=(0, 4))
+    summary_table.add_column(justify="left")
     summary_table.add_column(style="bright_white")
 
     summary_table.add_row(
-        "[bold white on #16a34a]  COMPLETED  [/]",
+        make_badge("COMPLETED", "#16a34a", 14),
         f"[bold bright_green]{success_count}[/] / [bold bright_white]{total}[/] tracks successfully processed",
     )
     if failed_count > 0:
         summary_table.add_row(
-            "[bold white on #dc2626]   FAILED    [/]",
+            make_badge("FAILED", "#dc2626", 14),
             f"[bold red]{failed_count}[/] tracks encountered errors or skipped",
         )
     summary_table.add_row(
-        "[bold white on #0284c7]   OUTPUT    [/]",
+        make_badge("OUTPUT", "#0284c7", 14),
         f"[bold bright_cyan]{os.path.abspath(output_dir)}[/bold bright_cyan]",
     )
     if csv_path and os.path.exists(csv_path):
         summary_table.add_row(
-            "[bold white on #7c3aed] CSV RECORD  [/]",
+            make_badge("CSV RECORD", "#7c3aed", 14),
             f"[bold bright_magenta]{os.path.abspath(csv_path)}[/bold bright_magenta]",
         )
     mins, secs = divmod(int(elapsed_seconds), 60)
     summary_table.add_row(
-        "[bold white on #d97706]    TIME     [/]",
+        make_badge("TIME", "#d97706", 14),
         f"[bold #facc15]{mins}m {secs:02d}s[/bold #facc15]",
     )
 
