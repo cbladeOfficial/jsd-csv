@@ -52,5 +52,38 @@ class TestUIBadges(unittest.TestCase):
         self.assertEqual(left_spaces, 3)
 
 
+    def test_smart_metrics_column_left_alignment(self):
+        """Verify SmartMetricsColumn uses consistent left-alignment with zero leading spaces for even vertical alignment."""
+        from unittest.mock import MagicMock
+        from jsd_csv.downloader import SmartMetricsColumn
+
+        col = SmartMetricsColumn(width=11)
+
+        # Counter task (overall collection)
+        task_counter = MagicMock()
+        task_counter.fields = {"unit": "tracks"}
+        task_counter.completed = 3
+        task_counter.total = 3
+
+        # Complete task (finished track)
+        task_complete = MagicMock()
+        task_complete.fields = {"unit": "step", "step_text": "Complete"}
+
+        counter_text = col.render(task_counter).plain
+        complete_text = col.render(task_complete).plain
+
+        # Both strings must have length equal to column width
+        self.assertEqual(len(counter_text), 11)
+        self.assertEqual(len(complete_text), 11)
+
+        # Both must start immediately at index 0 (0 leading spaces) to eliminate horizontal raggedness
+        self.assertTrue(counter_text.startswith("[3/3]"))
+        self.assertTrue(complete_text.startswith("Complete"))
+
+        # Both left-alignment margins must match (zero leading offset)
+        self.assertEqual(len(counter_text) - len(counter_text.lstrip(" ")), 0)
+        self.assertEqual(len(complete_text) - len(complete_text.lstrip(" ")), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

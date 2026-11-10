@@ -137,22 +137,28 @@ class QuoTimeColumn(ProgressColumn):
 
 
 class SmartMetricsColumn(ProgressColumn):
-    """Renders '[1/5]' for collection, or '4.2M/8.5M' for streaming bytes."""
+    """Renders left-aligned '[1/5]' for collection, or '4.2M/8.5M' for streaming bytes, or step status."""
+
+    def __init__(self, width: int = 11):
+        self.width = width
+        super().__init__()
 
     def render(self, task) -> Text:
         unit = task.fields.get("unit", "bytes")
         if unit == "tracks":
             c = int(task.completed)
             t = int(task.total) if task.total is not None else 0
-            return Text(f"[{c}/{t}]".center(9), style="bold #94a3b8")
+            label = f"[{c}/{t}]"
+            return Text(f"{label:<{self.width}}", style="bold #94a3b8")
         elif unit == "bytes":
             c = format_short_size(int(task.completed))
             t = format_short_size(int(task.total)) if task.total else "?"
-            return Text(f"{c}/{t}".center(9), style="bold #94a3b8")
+            label = f"{c}/{t}"
+            return Text(f"{label:<{self.width}}", style="bold #94a3b8")
         elif unit == "step":
             st = task.fields.get("step_text", "")
-            return Text(f"{st}".center(9), style="bold #c084fc")
-        return Text(" " * 9)
+            return Text(f"{st:<{self.width}}", style="bold #c084fc")
+        return Text(" " * self.width)
 
 
 class SmartSpeedColumn(ProgressColumn):
@@ -324,8 +330,8 @@ class DownloaderEngine:
             QuoPercentageColumn(),
             TextColumn(" "),
             QuoStyleBarColumn(bar_width=bar_w),
-            TextColumn(" "),
-            SmartMetricsColumn(),
+            TextColumn("  "),
+            SmartMetricsColumn(width=11),
             SmartSpeedColumn(),
             QuoTimeColumn(),
             console=console,
