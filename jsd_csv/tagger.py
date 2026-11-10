@@ -27,6 +27,8 @@ from mutagen.id3 import (
     USLT,
 )
 
+from .formatter import heal_compound_artists
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,6 +88,8 @@ def embed_metadata(
                 if a.lower() not in seen_artists:
                     seen_artists.add(a.lower())
                     clean_artists_list.append(a)
+
+        clean_artists_list = heal_compound_artists(clean_artists_list)
 
         if clean_artists_list:
             # 1. Official ID3 TPE1 frame with discrete list of artists (null-separated in v2.4, slash-separated in v2.3)

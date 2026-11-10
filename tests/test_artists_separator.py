@@ -91,6 +91,52 @@ class TestArtistsSeparator(unittest.TestCase):
         res = format_filename("{artists} - {title}", meta, artists_separator=", ")
         self.assertEqual(res, "Artist A, Artist B - Song")
 
+    def test_compound_artist_with_comma_tyler(self):
+        # Tyler, The Creator contains an internal comma in his stage name
+        meta = {
+            "title": "See You Again",
+            "artists_list": ["Tyler, The Creator", "Kali Uchis"],
+        }
+        res_slash = format_filename("{artists} - {title}", meta, artists_separator=" / ")
+        self.assertEqual(res_slash, "Tyler, The Creator _ Kali Uchis - See You Again")
+
+        res_amp = format_filename("{artists} - {title}", meta, artists_separator=" & ")
+        self.assertEqual(res_amp, "Tyler, The Creator & Kali Uchis - See You Again")
+
+        # Even if raw string was split by comma, heal_compound_artists reconstructs Tyler, The Creator
+        meta_raw = {
+            "title": "See You Again",
+            "artists": "Tyler, The Creator, Kali Uchis",
+        }
+        res_healed = format_filename("{artists} - {title}", meta_raw, artists_separator=" & ")
+        self.assertEqual(res_healed, "Tyler, The Creator & Kali Uchis - See You Again")
+
+    def test_compound_artist_with_ampersand_simon_and_garfunkel(self):
+        # Simon & Garfunkel contains an '&' symbol as part of the group's name
+        meta = {
+            "title": "The Sound of Silence",
+            "artists_list": ["Simon & Garfunkel"],
+        }
+        res_default = format_filename("{artists} - {title}", meta)
+        self.assertEqual(res_default, "Simon & Garfunkel - The Sound of Silence")
+
+        # When collaborating with another artist, & in group name is preserved
+        meta_collab = {
+            "title": "Collab",
+            "artists_list": ["Simon & Garfunkel", "Bob Dylan"],
+        }
+        res_slash = format_filename("{artists} - {title}", meta_collab, artists_separator=" / ")
+        self.assertEqual(res_slash, "Simon & Garfunkel _ Bob Dylan - Collab")
+
+    def test_compound_artist_earth_wind_fire(self):
+        # Earth, Wind & Fire contains both comma and ampersand
+        meta_raw = {
+            "title": "September",
+            "artists": "Earth, Wind & Fire, Maurice White",
+        }
+        res = format_filename("{artists} - {title}", meta_raw, artists_separator=" / ")
+        self.assertEqual(res, "Earth, Wind & Fire _ Maurice White - September")
+
     def test_config_save_and_load_artists_separator(self):
         test_cfg_path = "test_config_temp.json"
         try:

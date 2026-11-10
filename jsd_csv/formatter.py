@@ -14,6 +14,46 @@ WINDOWS_RESERVED = {
     "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 }
 
+# Known legitimate artists containing internal commas or conjunctions that must not be split
+COMPOUND_ARTISTS = {
+    ("tyler", "the creator"): "Tyler, The Creator",
+    ("earth", "wind & fire"): "Earth, Wind & Fire",
+    ("earth", "wind and fire"): "Earth, Wind & Fire",
+    ("crosby", "stills", "nash & young"): "Crosby, Stills, Nash & Young",
+    ("crosby", "stills & nash"): "Crosby, Stills & Nash",
+    ("blood", "sweat & tears"): "Blood, Sweat & Tears",
+    ("emerson", "lake & palmer"): "Emerson, Lake & Palmer",
+    ("peter", "paul and mary"): "Peter, Paul and Mary",
+    ("peter", "paul & mary"): "Peter, Paul & Mary",
+}
+
+
+def heal_compound_artists(artists: List[str]) -> List[str]:
+    """
+    Reconstructs legitimate artist names that contain commas (e.g. 'Tyler, The Creator',
+    'Earth, Wind & Fire', 'Crosby, Stills, Nash & Young') which may have been naively split by commas.
+    """
+    if not artists:
+        return []
+    res: List[str] = []
+    i = 0
+    n = len(artists)
+    while i < n:
+        matched = False
+        for pattern, replacement in sorted(COMPOUND_ARTISTS.items(), key=lambda x: -len(x[0])):
+            plen = len(pattern)
+            if i + plen <= n:
+                window = tuple(str(a).lower().strip() for a in artists[i:i + plen])
+                if window == pattern:
+                    res.append(replacement)
+                    i += plen
+                    matched = True
+                    break
+        if not matched:
+            res.append(artists[i])
+            i += 1
+    return res
+
 
 def sanitize_filename_component(name: str, max_length: int = 120) -> str:
     """
@@ -177,6 +217,8 @@ def format_filename(template: str, metadata: Dict[str, Any], artists_separator: 
             s = item.strip()
             if s and s not in clean_artists:
                 clean_artists.append(s)
+
+    clean_artists = heal_compound_artists(clean_artists)
 
     if clean_artists:
         all_artists = sep.join(clean_artists)

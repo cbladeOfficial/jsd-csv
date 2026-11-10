@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
+from .formatter import heal_compound_artists
+
 logger = logging.getLogger(__name__)
 
 CSV_HEADERS = [
@@ -185,6 +187,7 @@ def load_csv(source: str) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         has_lyrics_val = str(get_val(r, "Has Lyrics", default="false")).lower() in ("yes", "true", "1")
 
         clean_artists_list = [a.strip() for a in raw_artists.split(",") if a.strip()]
+        clean_artists_list = heal_compound_artists(clean_artists_list)
 
         song_dict = {
             "track_number": track_num,

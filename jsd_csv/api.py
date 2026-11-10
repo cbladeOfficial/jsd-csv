@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 from .crypto import decrypt_saavn_url
+from .formatter import heal_compound_artists
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,8 @@ class JioSaavnAPI:
             add_artist(more_info.get("music", ""))
         if not unique_artists and raw.get("subtitle"):
             add_artist(raw.get("subtitle", ""))
+
+        unique_artists = heal_compound_artists(unique_artists)
 
         essential_artists = ", ".join(unique_artists) if unique_artists else "Unknown Artist"
         primary_artist_str = unique_artists[0] if unique_artists else "Unknown Artist"
