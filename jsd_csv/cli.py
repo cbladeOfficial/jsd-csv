@@ -42,17 +42,26 @@ Examples:
   # Download only audio files (no CSV) using YouTube Music fallback:
   jsd-csv -u "Kesariya Arijit Singh" -m songs -s auto --cookies ./cookies.txt
 
-Supported Filename Identifiers:
-  {title}         Song title
-  {artist}        Primary artist name
-  {artists}       All artists (comma-separated)
-  {album}         Album name
-  {year}          Release year
-  {track}         Padded track number (01, 02...)
-  {track_number}  Raw track number (1, 2...)
-  {id}            JioSaavn song ID
-  {duration}      Duration (e.g. 03-45)
-  {language}      Song language
+Supported Filename Identifiers (supports {tag} or {tag-name}):
+  {title}           Song title ({song}, {name})
+  {artist}          Primary lead artist
+  {artists}         All track artists comma-separated ({all-artists})
+  {album_artist}    Album artist / music composer ({albumartist}, {album-artist})
+  {album}           Album name ({album-name})
+  {year}            Release year ({release-year})
+  {date}            Full release date ({release-date}, {original-date})
+  {track}           Padded track number e.g. 01, 02 ({track-number}, {tracknumber})
+  {raw_track}       Raw unpadded track number e.g. 1, 2
+  {tracks_count}    Total tracks in collection ({total-tracks})
+  {disc}            Disc number ({disc-number})
+  {duration}        Formatted duration e.g. 04-28
+  {duration_sec}    Duration in seconds e.g. 268 ({duration-seconds})
+  {language}        Song language ({genre})
+  {publisher}       Record label / publisher ({label})
+  {id}              JioSaavn song ID ({track-id})
+  {list_name}       Collection or playlist title ({playlist})
+  {list_position}   Position in playlist/collection ({playlist-index})
+  {output_ext}      Audio file extension e.g. mp3
         """,
     )
 

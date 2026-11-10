@@ -300,7 +300,7 @@ def prompt_interactive_options(
     render_step_header(
         step_num="7",
         title="Custom Filename Pattern",
-        subtitle="Tags: {artist}, {title}, {album}, {year}, {track}, {id}, {duration}, {language}",
+        subtitle="Tags: {artists}, {artist}, {album_artist}, {title}, {album}, {year}, {track}, {date}, {genre}...",
     )
     template = Prompt.ask(
         "  [bold #00f0ff]>[/] [bold white]Filename Pattern[/bold white]",

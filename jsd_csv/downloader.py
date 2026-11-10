@@ -336,6 +336,11 @@ class DownloaderEngine:
             )
 
             for idx, song in enumerate(songs):
+                song["total_tracks"] = total_tracks
+                song["tracks_count"] = total_tracks
+                song["list_length"] = total_tracks
+                song["list_name"] = coll_meta.get("title", "")
+                song["list_position"] = song.get("track_number") or idx + 1
                 track_title = song.get("title", "Unknown")
                 progress.update(
                     track_task,
@@ -473,10 +478,13 @@ class DownloaderEngine:
         """Downloads audio via JioSaavn direct or YT Music fallback, transcodes to MP3, and embeds tags."""
         track_title = song.get("title", "Unknown")
         rel_filename = format_filename(self.template, song)
-        dest_mp3 = os.path.join(self.output_dir, f"{rel_filename}.mp3")
+        if rel_filename.lower().endswith(".mp3"):
+            dest_mp3 = os.path.join(self.output_dir, rel_filename)
+        else:
+            dest_mp3 = os.path.join(self.output_dir, f"{rel_filename}.mp3")
         os.makedirs(os.path.dirname(dest_mp3), exist_ok=True)
 
-        song["filename"] = f"{os.path.basename(rel_filename)}.mp3"
+        song["filename"] = os.path.basename(dest_mp3)
         song["file_path"] = os.path.abspath(dest_mp3)
 
         # Skip download if already exists and non-empty

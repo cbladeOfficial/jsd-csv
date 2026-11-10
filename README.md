@@ -185,25 +185,35 @@ python main.py [OPTIONS]
 
 ## 🏷️ Filename Template Placeholders
 
-Identifiers are **case-insensitive** and automatically sanitized for Windows, Linux, and macOS:
+Identifiers are **case-insensitive**, support both hyphens and underscores (e.g. `{album-artist}` or `{album_artist}`), and are automatically sanitized for Windows, Linux, and macOS:
 
 | Identifier | Description | Example |
 | :--- | :--- | :--- |
-| `{title}` | Song title | `Kesariya` |
-| `{artist}` | Primary artist name | `Arijit Singh` |
-| `{artists}` | All credited artists (comma-separated) | `Arijit Singh, Pritam` |
-| `{album}` | Album name | `Brahmastra` |
-| `{year}` | Release year | `2022` |
-| `{track}` | Zero-padded track number | `01`, `02`, `10` |
-| `{track_number}` | Raw track number | `1`, `2`, `10` |
+| `{title}` | Song title (aliases: `{song}`, `{name}`) | `Kesariya` |
+| `{artist}` | Primary lead artist (alias: `{primary_artist}`) | `Arijit Singh` |
+| `{artists}` | All track artists comma-separated (alias: `{all_artists}`) | `Pritam, Arijit Singh, Amitabh Bhattacharya` |
+| `{album_artist}` | Album artist / primary composer (`{albumartist}`, `{album-artist}`) | `Pritam` |
+| `{album}` | Album name (alias: `{album_name}`) | `Brahmastra` |
+| `{year}` | 4-digit release year (`{release_year}`) | `2022` |
+| `{date}` | Full release date (`{release_date}`, `{original_date}`) | `2022-09-09` |
+| `{track}` | Zero-padded track number (`{track_number}`, `{tracknumber}`) | `01`, `02`, `10` |
+| `{raw_track}` | Raw unpadded track number (`{track_raw}`) | `1`, `2`, `10` |
+| `{tracks_count}` | Total track count in collection (`{total_tracks}`) | `09`, `15` |
+| `{disc}` | Zero-padded disc number (`{disc_number}`) | `01` |
 | `{duration}` | Formatted duration with hyphens | `04-28` |
-| `{language}` | Song language | `Hindi` |
-| `{id}` | JioSaavn track ID | `rjkrTnma` |
+| `{duration_sec}`| Exact duration in seconds (`{duration_seconds}`) | `268` |
+| `{language}` | Song language or genre (`{genre}`) | `Hindi` |
+| `{publisher}` | Record label / publisher (`{label}`, `{record_label}`) | `Sony Music` |
+| `{id}` | JioSaavn unique track ID (`{track_id}`, `{song_id}`) | `rjkrTnma` |
+| `{list_name}` | Playlist or collection title (`{playlist}`) | `Weekly Top Songs` |
+| `{list_position}`| Track position index in playlist (`{playlist_index}`) | `01`, `02` |
+| `{output_ext}` | Audio file extension (`{ext}`) | `mp3` |
 
 **Template Examples:**
 - `{artist} - {title}` &rarr; `Arijit Singh - Kesariya.mp3`
-- `{album}/{track} - {title}` &rarr; `Brahmastra/01 - Kesariya.mp3`
-- `[{year}] {artists} - {title}` &rarr; `[2022] Arijit Singh, Pritam - Kesariya.mp3`
+- `{album_artist}/{album}/{track} - {title}` &rarr; `Pritam/Brahmastra/01 - Kesariya.mp3`
+- `[{year}] {artists} - {title}` &rarr; `[2022] Pritam, Arijit Singh, Amitabh Bhattacharya - Kesariya.mp3`
+- `{album}/{list_position} - {title}.{output_ext}` &rarr; `Brahmastra/01 - Kesariya.mp3`
 
 ---
 
