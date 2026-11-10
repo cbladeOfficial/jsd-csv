@@ -488,11 +488,14 @@ def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> Non
     if has_year:
         table.add_column("Year", style="bold #fbbf24", width=6, justify="center", no_wrap=True)
     table.add_column("Duration", style="bold #4ade80", width=8, justify="center", no_wrap=True)
-    table.add_column("Lyrics", style="bold #f472b6", width=10, justify="center", no_wrap=True)
+    table.add_column(Align.center("Lyrics"), width=12, no_wrap=True)
 
     display_list = songs[:max_rows]
     for idx, s in enumerate(display_list):
-        lyrics_pill = "[bold white on #16a34a] LYRICS [/]" if (s.get("has_lyrics") or s.get("lyrics")) else "[dim]--[/]"
+        if s.get("has_lyrics") or s.get("lyrics"):
+            lyrics_cell = Align.center(Text("  LYRICS  ", style="bold white on #16a34a"))
+        else:
+            lyrics_cell = Align.center(Text("--", style="dim #f472b6"))
         dur_fmt = s.get("duration_formatted", "00:00")
         row = [
             f"{s.get('track_number') or idx + 1:02d}",
@@ -502,7 +505,7 @@ def display_tracks_table(songs: List[Dict[str, Any]], max_rows: int = 25) -> Non
         ]
         if has_year:
             row.append(str(s.get("year") or "--"))
-        row.extend([dur_fmt, lyrics_pill])
+        row.extend([dur_fmt, lyrics_cell])
         table.add_row(*row)
 
     console.print(table)
