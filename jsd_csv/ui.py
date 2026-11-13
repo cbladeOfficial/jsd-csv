@@ -575,3 +575,25 @@ def display_summary_report(
     console.print()
     console.print(panel)
     console.print()
+
+
+def print_interrupt_message(detail: Optional[str] = None) -> None:
+    """Renders a sleek, pleasant exit notification when interrupted via Ctrl+C (no emojis)."""
+    console.print()
+    badge = Text("  CANCELLED  ", style="bold white on #ef4444")
+    content = Text()
+    content.append_text(badge)
+    content.append("  ")
+    content.append("Operation cancelled by user (Ctrl+C). Exiting safely.", style="bold bright_white")
+    if detail:
+        content.append("\n\n  ")
+        content.append(detail, style="dim #94a3b8")
+
+    panel = Panel(
+        content,
+        box=box.ROUNDED,
+        border_style="#ef4444",
+        padding=(1, 3),
+    )
+    console.print(panel)
+    console.print()

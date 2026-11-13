@@ -22,5 +22,13 @@ if hasattr(sys.stderr, "reconfigure"):
 from jsd_csv.cli import main
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        try:
+            from jsd_csv.ui import print_interrupt_message
+            print_interrupt_message()
+        except Exception:
+            pass
+        sys.exit(130)
 

@@ -34,6 +34,7 @@ from .ui import (
     display_collection_header,
     display_summary_report,
     display_tracks_table,
+    print_interrupt_message,
 )
 from .ytmusic import YTMusicMatcher
 
@@ -224,6 +225,7 @@ class DownloaderEngine:
         self.api = JioSaavnAPI()
         self.yt_matcher = YTMusicMatcher(cookies_file=self.cookies_file, ffmpeg_path=get_ffmpeg_path())
         self.session = requests.Session()
+        self.interrupted: bool = False
 
     def run(
         self,
@@ -323,109 +325,121 @@ class DownloaderEngine:
         bar_w = 18 if is_wide else 14
         title_w = 18 if is_wide else 14
 
-        # Quo-style Progress Bar setup with braille spinner, lime pct, and cyan-red-grey bar
-        with Progress(
-            SpinnerColumn(spinner_name="dots", style="bold bright_white"),
-            TextColumn("{task.description}"),
-            QuoPercentageColumn(),
-            TextColumn(" "),
-            QuoStyleBarColumn(bar_width=bar_w),
-            TextColumn("  "),
-            SmartMetricsColumn(width=11),
-            SmartSpeedColumn(),
-            QuoTimeColumn(),
-            console=console,
-        ) as progress:
-            overall_task = progress.add_task(
-                make_stage_desc("PROGRESS", "#475569", "Collection", box_w=box_w, max_len=title_w),
-                total=total_tracks,
-                unit="tracks",
-            )
-            track_task = progress.add_task(
-                make_stage_desc("QUEUED", "#0891b2", "Waiting", box_w=box_w, max_len=title_w),
-                total=100,
-                unit="step",
-                step_text="Waiting",
-            )
-
-            for idx, song in enumerate(songs):
-                song["total_tracks"] = total_tracks
-                song["tracks_count"] = total_tracks
-                song["list_length"] = total_tracks
-                song["list_name"] = coll_meta.get("title", "")
-                song["list_position"] = song.get("track_number") or idx + 1
-                track_title = song.get("title", "Unknown")
-                progress.update(
-                    track_task,
-                    description=make_stage_desc("QUEUED", "#0891b2", track_title, box_w=box_w, max_len=title_w),
-                    completed=0,
+        interrupted = False
+        try:
+            # Quo-style Progress Bar setup with braille spinner, lime pct, and cyan-red-grey bar
+            with Progress(
+                SpinnerColumn(spinner_name="dots", style="bold bright_white"),
+                TextColumn("{task.description}"),
+                QuoPercentageColumn(),
+                TextColumn(" "),
+                QuoStyleBarColumn(bar_width=bar_w),
+                TextColumn("  "),
+                SmartMetricsColumn(width=11),
+                SmartSpeedColumn(),
+                QuoTimeColumn(),
+                console=console,
+            ) as progress:
+                overall_task = progress.add_task(
+                    make_stage_desc("PROGRESS", "#475569", "Collection", box_w=box_w, max_len=title_w),
+                    total=total_tracks,
+                    unit="tracks",
+                )
+                track_task = progress.add_task(
+                    make_stage_desc("QUEUED", "#0891b2", "Waiting", box_w=box_w, max_len=title_w),
                     total=100,
                     unit="step",
-                    step_text="Resolving",
+                    step_text="Waiting",
                 )
 
-                # If loaded from CSV, resolve any missing JioSaavn streams or details
-                if song.get("from_csv"):
-                    self._enrich_song_from_csv(song)
-
-                # Fetch lyrics if enabled and needed
-                if self.fetch_lyrics and not song.get("lyrics"):
-                    if song.get("has_lyrics") or song.get("lyrics_id"):
-                        lyrics_id = song.get("lyrics_id") or song.get("id")
-                        if lyrics_id:
-                            song["lyrics"] = self.api.get_lyrics(lyrics_id)
-
-                # Search exact match on YouTube Music if not already recorded
-                if not song.get("yt_video_id"):
-                    try:
-                        yt_match = self.yt_matcher.search_exact_match(song)
-                        if yt_match:
-                            song["yt_title"] = yt_match.get("title", "")
-                            song["yt_video_id"] = yt_match.get("video_id", "")
-                            song["yt_url"] = yt_match.get("url", "")
-                            song["yt_match_score"] = yt_match.get("match_score", 0.0)
-                    except Exception as e:
-                        logger.debug(f"YT Music match failed for {track_title}: {e}")
-
-                # Audio download handling
-                song["bitrate"] = f"{self.quality} kbps"
-                if self.mode == "csv":
-                    song["download_status"] = "CSV Only"
+                for idx, song in enumerate(songs):
+                    song["total_tracks"] = total_tracks
+                    song["tracks_count"] = total_tracks
+                    song["list_length"] = total_tracks
+                    song["list_name"] = coll_meta.get("title", "")
+                    song["list_position"] = song.get("track_number") or idx + 1
+                    track_title = song.get("title", "Unknown")
                     progress.update(
                         track_task,
-                        description=make_stage_desc("RECORDED", "#0d9488", track_title, box_w=box_w, max_len=title_w),
-                        unit="step",
-                        step_text="CSV Record",
-                        completed=100,
+                        description=make_stage_desc("QUEUED", "#0891b2", track_title, box_w=box_w, max_len=title_w),
+                        completed=0,
                         total=100,
+                        unit="step",
+                        step_text="Resolving",
                     )
-                    success_count += 1
-                else:
-                    # Download audio & embed metadata tags + cover
-                    ok = self._download_and_tag_track(
-                        song=song,
-                        progress=progress,
-                        track_task=track_task,
-                        box_w=box_w,
-                        title_len=title_w,
-                    )
-                    if ok:
-                        song["download_status"] = "Downloaded"
+
+                    # If loaded from CSV, resolve any missing JioSaavn streams or details
+                    if song.get("from_csv"):
+                        self._enrich_song_from_csv(song)
+
+                    # Fetch lyrics if enabled and needed
+                    if self.fetch_lyrics and not song.get("lyrics"):
+                        if song.get("has_lyrics") or song.get("lyrics_id"):
+                            lyrics_id = song.get("lyrics_id") or song.get("id")
+                            if lyrics_id:
+                                song["lyrics"] = self.api.get_lyrics(lyrics_id)
+
+                    # Search exact match on YouTube Music if not already recorded
+                    if not song.get("yt_video_id"):
+                        try:
+                            yt_match = self.yt_matcher.search_exact_match(song)
+                            if yt_match:
+                                song["yt_title"] = yt_match.get("title", "")
+                                song["yt_video_id"] = yt_match.get("video_id", "")
+                                song["yt_url"] = yt_match.get("url", "")
+                                song["yt_match_score"] = yt_match.get("match_score", 0.0)
+                        except Exception as e:
+                            logger.debug(f"YT Music match failed for {track_title}: {e}")
+
+                    # Audio download handling
+                    song["bitrate"] = f"{self.quality} kbps"
+                    if self.mode == "csv":
+                        song["download_status"] = "CSV Only"
+                        progress.update(
+                            track_task,
+                            description=make_stage_desc("RECORDED", "#0d9488", track_title, box_w=box_w, max_len=title_w),
+                            unit="step",
+                            step_text="CSV Record",
+                            completed=100,
+                            total=100,
+                        )
                         success_count += 1
                     else:
-                        song["download_status"] = "Failed"
-                        failed_count += 1
+                        # Download audio & embed metadata tags + cover
+                        ok = self._download_and_tag_track(
+                            song=song,
+                            progress=progress,
+                            track_task=track_task,
+                            box_w=box_w,
+                            title_len=title_w,
+                        )
+                        if ok:
+                            song["download_status"] = "Downloaded"
+                            success_count += 1
+                        else:
+                            song["download_status"] = "Failed"
+                            failed_count += 1
 
-                processed_records.append(song)
-                progress.advance(overall_task)
+                    processed_records.append(song)
+                    progress.advance(overall_task)
+        except KeyboardInterrupt:
+            interrupted = True
 
         # Write or update CSV file
         csv_path = None
-        if csv_exporter:
+        if csv_exporter and processed_records:
             try:
                 csv_path = csv_exporter.write_all(processed_records)
             except Exception as e:
                 console.print(f"[bold red]Failed to write CSV file:[/bold red] {e}")
+
+        if interrupted:
+            detail = None
+            if processed_records and success_count > 0:
+                detail = f"Preserved {success_count} completed track(s) in CSV record: {os.path.abspath(csv_path)}" if csv_path else f"Preserved {success_count} completed track(s)."
+            print_interrupt_message(detail=detail)
+            self.interrupted = True
+            return total_tracks, success_count, csv_path
 
         # Summary report
         elapsed = time.time() - start_time
@@ -525,87 +539,96 @@ class DownloaderEngine:
 
         downloaded_source = None
 
-        # Strategy 1: Attempt direct download from JioSaavn CDN
-        if self.source in ("auto", "saavn"):
-            direct_ok = self._try_saavn_direct_download(
-                song=song,
-                dest_mp3=dest_mp3,
-                progress=progress,
-                track_task=track_task,
-                box_w=box_w,
-                title_len=title_len,
-            )
-            if direct_ok:
-                downloaded_source = "JioSaavn CDN"
-
-        # Strategy 2: Fallback to YouTube Music
-        if not downloaded_source and self.source in ("auto", "ytmusic"):
-            yt_id = song.get("yt_video_id")
-            if not yt_id:
-                yt_match = self.yt_matcher.search_exact_match(song)
-                if yt_match:
-                    yt_id = yt_match.get("video_id")
-                    song["yt_video_id"] = yt_id
-                    song["yt_url"] = yt_match.get("url")
-                    song["yt_title"] = yt_match.get("title")
-            if yt_id:
-                yt_ok = self._try_ytmusic_download(
-                    video_id=yt_id,
+        try:
+            # Strategy 1: Attempt direct download from JioSaavn CDN
+            if self.source in ("auto", "saavn"):
+                direct_ok = self._try_saavn_direct_download(
+                    song=song,
                     dest_mp3=dest_mp3,
                     progress=progress,
                     track_task=track_task,
-                    track_title=track_title,
                     box_w=box_w,
                     title_len=title_len,
                 )
-                if yt_ok:
-                    downloaded_source = "YouTube Music"
+                if direct_ok:
+                    downloaded_source = "JioSaavn CDN"
 
-        if not downloaded_source or not os.path.exists(dest_mp3):
+            # Strategy 2: Fallback to YouTube Music
+            if not downloaded_source and self.source in ("auto", "ytmusic"):
+                yt_id = song.get("yt_video_id")
+                if not yt_id:
+                    yt_match = self.yt_matcher.search_exact_match(song)
+                    if yt_match:
+                        yt_id = yt_match.get("video_id")
+                        song["yt_video_id"] = yt_id
+                        song["yt_url"] = yt_match.get("url")
+                        song["yt_title"] = yt_match.get("title")
+                if yt_id:
+                    yt_ok = self._try_ytmusic_download(
+                        video_id=yt_id,
+                        dest_mp3=dest_mp3,
+                        progress=progress,
+                        track_task=track_task,
+                        track_title=track_title,
+                        box_w=box_w,
+                        title_len=title_len,
+                    )
+                    if yt_ok:
+                        downloaded_source = "YouTube Music"
+
+            if not downloaded_source or not os.path.exists(dest_mp3):
+                if progress and track_task is not None:
+                    progress.update(
+                        track_task,
+                        description=make_stage_desc("FAILED", "#dc2626", track_title, box_w=box_w, max_len=title_len),
+                        unit="step",
+                        step_text="Failed",
+                        completed=0,
+                        total=100,
+                    )
+                return False
+
+            song["audio_source"] = downloaded_source
+
+            # Embed complete ID3 metadata, lyrics, and album cover
             if progress and track_task is not None:
                 progress.update(
                     track_task,
-                    description=make_stage_desc("FAILED", "#dc2626", track_title, box_w=box_w, max_len=title_len),
+                    description=make_stage_desc("METADATA", "#d97706", track_title, box_w=box_w, max_len=title_len),
                     unit="step",
-                    step_text="Failed",
-                    completed=0,
+                    step_text="ID3+Art",
+                    completed=90,
                     total=100,
                 )
-            return False
 
-        song["audio_source"] = downloaded_source
-
-        # Embed complete ID3 metadata, lyrics, and album cover
-        if progress and track_task is not None:
-            progress.update(
-                track_task,
-                description=make_stage_desc("METADATA", "#d97706", track_title, box_w=box_w, max_len=title_len),
-                unit="step",
-                step_text="ID3+Art",
-                completed=90,
-                total=100,
+            embed_metadata(
+                mp3_file_path=dest_mp3,
+                song_metadata=song,
+                lyrics=song.get("lyrics"),
+                embed_cover=self.embed_cover,
+                session=self.session,
+                id3_version=self.id3_version,
             )
 
-        embed_metadata(
-            mp3_file_path=dest_mp3,
-            song_metadata=song,
-            lyrics=song.get("lyrics"),
-            embed_cover=self.embed_cover,
-            session=self.session,
-            id3_version=self.id3_version,
-        )
+            if progress and track_task is not None:
+                progress.update(
+                    track_task,
+                    description=make_stage_desc("COMPLETE", "#16a34a", track_title, box_w=box_w, max_len=title_len),
+                    unit="step",
+                    step_text="Complete",
+                    completed=100,
+                    total=100,
+                )
 
-        if progress and track_task is not None:
-            progress.update(
-                track_task,
-                description=make_stage_desc("COMPLETE", "#16a34a", track_title, box_w=box_w, max_len=title_len),
-                unit="step",
-                step_text="Complete",
-                completed=100,
-                total=100,
-            )
+            return True
 
-        return True
+        except KeyboardInterrupt:
+            if os.path.exists(dest_mp3) and os.path.getsize(dest_mp3) < 10000:
+                try:
+                    os.remove(dest_mp3)
+                except Exception:
+                    pass
+            raise
 
     def _try_saavn_direct_download(
         self,

@@ -10,7 +10,7 @@ from typing import List, Optional
 from . import __app_name__, __description__, __version__
 from .config import find_default_config, load_config, save_config
 from .downloader import DownloaderEngine
-from .ui import console, print_banner, prompt_interactive_options
+from .ui import console, print_banner, print_interrupt_message, prompt_interactive_options
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -234,138 +234,146 @@ def main(argv: Optional[List[str]] = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    try:
+        parser = build_parser()
+        args = parser.parse_args(argv)
 
-    print_banner()
+        print_banner()
 
-    # 1. Resolve configuration profile
-    cfg_file = args.config_file
-    loaded_cfg = None
-    if cfg_file:
-        try:
-            loaded_cfg = load_config(cfg_file)
-            console.print(f"  [bold green]Loaded configuration from:[/] [bold cyan]{cfg_file}[/bold cyan]\n")
-        except Exception as e:
-            console.print(f"[bold red]Error loading config file '{cfg_file}':[/bold red] {e}")
-            return 1
-    elif not args.url and not args.from_csv and not args.interactive:
-        # Check if default config exists in current directory
-        default_cfg = find_default_config()
-        if default_cfg:
+        # 1. Resolve configuration profile
+        cfg_file = args.config_file
+        loaded_cfg = None
+        if cfg_file:
             try:
-                loaded_cfg = load_config(default_cfg)
-                cfg_file = default_cfg
-            except Exception:
-                loaded_cfg = None
+                loaded_cfg = load_config(cfg_file)
+                console.print(f"  [bold green]Loaded configuration from:[/] [bold cyan]{cfg_file}[/bold cyan]\n")
+            except Exception as e:
+                console.print(f"[bold red]Error loading config file '{cfg_file}':[/bold red] {e}")
+                return 1
+        elif not args.url and not args.from_csv and not args.interactive:
+            # Check if default config exists in current directory
+            default_cfg = find_default_config()
+            if default_cfg:
+                try:
+                    loaded_cfg = load_config(default_cfg)
+                    cfg_file = default_cfg
+                except Exception:
+                    loaded_cfg = None
 
-    # Merge configuration if present
-    effective_url = args.url
-    effective_csv = args.from_csv
-    effective_output = args.output
-    effective_mode = args.mode
-    effective_quality = args.quality
-    effective_source = args.source
-    effective_template = args.template
-    effective_artists_separator = args.artists_separator
-    effective_lyrics = args.lyrics
-    effective_cover = args.cover
-    effective_cookies = args.cookies
-    effective_id3_version = args.id3_version
+        # Merge configuration if present
+        effective_url = args.url
+        effective_csv = args.from_csv
+        effective_output = args.output
+        effective_mode = args.mode
+        effective_quality = args.quality
+        effective_source = args.source
+        effective_template = args.template
+        effective_artists_separator = args.artists_separator
+        effective_lyrics = args.lyrics
+        effective_cover = args.cover
+        effective_cookies = args.cookies
+        effective_id3_version = args.id3_version
 
-    if loaded_cfg:
-        if not effective_url and loaded_cfg.get("url"):
-            effective_url = loaded_cfg.get("url")
-        if not effective_csv and loaded_cfg.get("csv"):
-            effective_csv = loaded_cfg.get("csv")
-        if not any(a in argv for a in ("-o", "--output")) and loaded_cfg.get("output"):
-            effective_output = loaded_cfg.get("output")
-        if not any(a in argv for a in ("-m", "--mode")) and loaded_cfg.get("mode"):
-            effective_mode = loaded_cfg.get("mode")
-        if not any(a in argv for a in ("-q", "--quality")) and loaded_cfg.get("quality"):
-            effective_quality = str(loaded_cfg.get("quality"))
-        if not any(a in argv for a in ("-s", "--source")) and loaded_cfg.get("source"):
-            effective_source = loaded_cfg.get("source")
-        if not any(a in argv for a in ("-t", "--template")) and loaded_cfg.get("template"):
-            effective_template = loaded_cfg.get("template")
-        if not any(a.startswith(("--artists-separator", "--artist-separator")) for a in argv) and "artists_separator" in loaded_cfg:
-            effective_artists_separator = str(loaded_cfg["artists_separator"])
-        if not any(a in argv for a in ("--lyrics", "--no-lyrics")) and "lyrics" in loaded_cfg:
-            effective_lyrics = bool(loaded_cfg.get("lyrics"))
-        if not any(a in argv for a in ("--cover", "--no-cover")) and "cover" in loaded_cfg:
-            effective_cover = bool(loaded_cfg.get("cover"))
-        if not any(a in argv for a in ("-c", "--cookies")) and loaded_cfg.get("cookies"):
-            effective_cookies = loaded_cfg.get("cookies")
-        if not any(a in argv for a in ("--id3-version",)) and loaded_cfg.get("id3_version"):
-            effective_id3_version = int(loaded_cfg.get("id3_version"))
+        if loaded_cfg:
+            if not effective_url and loaded_cfg.get("url"):
+                effective_url = loaded_cfg.get("url")
+            if not effective_csv and loaded_cfg.get("csv"):
+                effective_csv = loaded_cfg.get("csv")
+            if not any(a in argv for a in ("-o", "--output")) and loaded_cfg.get("output"):
+                effective_output = loaded_cfg.get("output")
+            if not any(a in argv for a in ("-m", "--mode")) and loaded_cfg.get("mode"):
+                effective_mode = loaded_cfg.get("mode")
+            if not any(a in argv for a in ("-q", "--quality")) and loaded_cfg.get("quality"):
+                effective_quality = str(loaded_cfg.get("quality"))
+            if not any(a in argv for a in ("-s", "--source")) and loaded_cfg.get("source"):
+                effective_source = loaded_cfg.get("source")
+            if not any(a in argv for a in ("-t", "--template")) and loaded_cfg.get("template"):
+                effective_template = loaded_cfg.get("template")
+            if not any(a.startswith(("--artists-separator", "--artist-separator")) for a in argv) and "artists_separator" in loaded_cfg:
+                effective_artists_separator = str(loaded_cfg["artists_separator"])
+            if not any(a in argv for a in ("--lyrics", "--no-lyrics")) and "lyrics" in loaded_cfg:
+                effective_lyrics = bool(loaded_cfg.get("lyrics"))
+            if not any(a in argv for a in ("--cover", "--no-cover")) and "cover" in loaded_cfg:
+                effective_cover = bool(loaded_cfg.get("cover"))
+            if not any(a in argv for a in ("-c", "--cookies")) and loaded_cfg.get("cookies"):
+                effective_cookies = loaded_cfg.get("cookies")
+            if not any(a in argv for a in ("--id3-version",)) and loaded_cfg.get("id3_version"):
+                effective_id3_version = int(loaded_cfg.get("id3_version"))
 
-    # Determine whether to run interactive mode
-    is_interactive = args.interactive or (not effective_url and not effective_csv)
+        # Determine whether to run interactive mode
+        is_interactive = args.interactive or (not effective_url and not effective_csv)
 
-    if is_interactive:
-        config = prompt_interactive_options(existing_config=loaded_cfg, config_filename=cfg_file)
-        # Handle save-config if requested via CLI flag
-        if args.save_config_file:
-            save_config(config, args.save_config_file)
-            console.print(f"  [bold green]Settings saved to:[/] [bold cyan]{args.save_config_file}[/bold cyan]\n")
+        if is_interactive:
+            config = prompt_interactive_options(existing_config=loaded_cfg, config_filename=cfg_file)
+            # Handle save-config if requested via CLI flag
+            if args.save_config_file:
+                save_config(config, args.save_config_file)
+                console.print(f"  [bold green]Settings saved to:[/] [bold cyan]{args.save_config_file}[/bold cyan]\n")
 
-        engine = DownloaderEngine(
-            output_dir=config["output"],
-            mode=config["mode"],
-            quality=config["quality"],
-            source=config["source"],
-            template=config["template"],
-            artists_separator=config.get("artists_separator", effective_artists_separator),
-            fetch_lyrics=config["lyrics"],
-            embed_cover=config["cover"],
-            cookies_file=config["cookies"],
-            id3_version=config.get("id3_version", effective_id3_version),
-        )
-        total, success, csv_path = engine.run(
-            input_target=config.get("url"),
-            csv_source=config.get("csv"),
-            auto_confirm=False,
-        )
-    else:
-        # Save config if flag passed
-        if args.save_config_file:
-            saved_dict = {
-                "url": effective_url,
-                "csv": effective_csv,
-                "output": effective_output,
-                "mode": effective_mode,
-                "quality": effective_quality,
-                "source": effective_source,
-                "template": effective_template,
-                "artists_separator": effective_artists_separator,
-                "lyrics": effective_lyrics,
-                "cover": effective_cover,
-                "cookies": effective_cookies,
-                "id3_version": effective_id3_version,
-            }
-            save_config(saved_dict, args.save_config_file)
-            console.print(f"  [bold green]Settings saved to:[/] [bold cyan]{args.save_config_file}[/bold cyan]\n")
+            engine = DownloaderEngine(
+                output_dir=config["output"],
+                mode=config["mode"],
+                quality=config["quality"],
+                source=config["source"],
+                template=config["template"],
+                artists_separator=config.get("artists_separator", effective_artists_separator),
+                fetch_lyrics=config["lyrics"],
+                embed_cover=config["cover"],
+                cookies_file=config["cookies"],
+                id3_version=config.get("id3_version", effective_id3_version),
+            )
+            total, success, csv_path = engine.run(
+                input_target=config.get("url"),
+                csv_source=config.get("csv"),
+                auto_confirm=False,
+            )
+        else:
+            # Save config if flag passed
+            if args.save_config_file:
+                saved_dict = {
+                    "url": effective_url,
+                    "csv": effective_csv,
+                    "output": effective_output,
+                    "mode": effective_mode,
+                    "quality": effective_quality,
+                    "source": effective_source,
+                    "template": effective_template,
+                    "artists_separator": effective_artists_separator,
+                    "lyrics": effective_lyrics,
+                    "cover": effective_cover,
+                    "cookies": effective_cookies,
+                    "id3_version": effective_id3_version,
+                }
+                save_config(saved_dict, args.save_config_file)
+                console.print(f"  [bold green]Settings saved to:[/] [bold cyan]{args.save_config_file}[/bold cyan]\n")
 
-        engine = DownloaderEngine(
-            output_dir=effective_output,
-            mode=effective_mode,
-            quality=effective_quality,
-            source=effective_source,
-            template=effective_template,
-            artists_separator=effective_artists_separator,
-            fetch_lyrics=effective_lyrics,
-            embed_cover=effective_cover,
-            cookies_file=effective_cookies,
-            csv_filename=args.csv_name,
-            id3_version=effective_id3_version,
-        )
-        total, success, csv_path = engine.run(
-            input_target=effective_url,
-            csv_source=effective_csv,
-            auto_confirm=args.yes,
-        )
+            engine = DownloaderEngine(
+                output_dir=effective_output,
+                mode=effective_mode,
+                quality=effective_quality,
+                source=effective_source,
+                template=effective_template,
+                artists_separator=effective_artists_separator,
+                fetch_lyrics=effective_lyrics,
+                embed_cover=effective_cover,
+                cookies_file=effective_cookies,
+                csv_filename=args.csv_name,
+                id3_version=effective_id3_version,
+            )
+            total, success, csv_path = engine.run(
+                input_target=effective_url,
+                csv_source=effective_csv,
+                auto_confirm=args.yes,
+            )
 
-    return 0 if (total > 0 and success > 0) or (effective_mode == "csv" and total > 0) else 1
+        if getattr(engine, "interrupted", False):
+            return 130
+
+        return 0 if (total > 0 and success > 0) or (effective_mode == "csv" and total > 0) else 1
+
+    except KeyboardInterrupt:
+        print_interrupt_message()
+        return 130
 
 
 if __name__ == "__main__":
